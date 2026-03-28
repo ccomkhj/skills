@@ -1,8 +1,7 @@
 # Skills
 
-A collection of Claude Code skills for coding agents.
+My personal skills.
 
-## Skills
 
 | Skill | Description | Source |
 |-------|-------------|--------|
