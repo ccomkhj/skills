@@ -19,9 +19,9 @@ Review the plan as an editor, not a coauthor. Preserve the original structure an
    - Ask for concrete execution flaws only: wrong ordering, missing prerequisites, hidden assumptions, unclear ownership, unverifiable steps, risky execution, or a better replacement approach.
    - Do not leak your own diagnosis or preferred answer into the subagent prompt.
 4. Filter subagent responses before annotating.
-   - Accept feedback only when it is specific, internally coherent, and improves the plan in context.
-   - Reject feedback that is stylistic, generic, or unsupported by available context.
-   - Prefer leaving a section untouched when the critique only asks for extra detail rather than identifying a material execution problem.
+   - Accept feedback only when you are confident the section is concretely wrong — wrong ordering, wrong assumption, missing dependency that will cause failure.
+   - Reject anything that is stylistic, generic, speculative ("this might cause issues"), or just asking for more detail.
+   - When in doubt, leave it untouched. A false positive annotation wastes the user's time and erodes trust in the review.
 5. Annotate the plan inline only for issues that survive filtering.
    - Insert the note immediately below the smallest affected unit: prefer the exact step over the whole section when possible.
    - Preserve the user's original text; do not silently rewrite it.
@@ -32,17 +32,11 @@ Review the plan as an editor, not a coauthor. Preserve the original structure an
 
 ## Review Standard
 
-Validate each unit against these questions:
+Only annotate when you can answer **yes** to this question:
 
-- Does this section move directly toward the stated goal?
-- Are prerequisites, dependencies, and sequencing correct?
-- Is anything critical missing: validation, rollback, ownership, acceptance criteria, or required inputs?
-- Is the proposed approach feasible with the stated tools and constraints?
-- Does the step create avoidable risk or irreversible changes without guardrails?
-- Is the replacement approach materially clearer, safer, or more reliable than the original?
-- Is the problem material enough to change execution, safety, or outcome, instead of merely asking for more specificity?
+> "If the user follows this plan as written, will this specific point cause a failure, data loss, or incorrect result?"
 
-Do not force criticism. If the section is sound, or the missing detail is ordinary implementation follow-through rather than a real flaw, leave it untouched.
+If the answer is "probably not" or "it depends", do not annotate. Plans are intentionally high-level — missing detail is normal, not a flaw. The bar is: **you are confident something is wrong**, not that something *could be* better.
 
 ## Subagent Prompt Pattern
 
@@ -69,19 +63,20 @@ For each section, return:
 Also flag cross-section problems: ordering conflicts, duplicated work, or missing handoffs between these sections.
 
 Do not comment on tone or style alone.
-Treat normal planning shorthand as acceptable. Mark `sound` unless the missing detail materially blocks safe or correct execution.
+Treat normal planning shorthand as acceptable. Default to `sound`. Only mark `issue` when you are confident the step is concretely wrong — not when it could be more detailed or slightly better.
 ```
 
 Keep subagent prompts task-local. Do not mention that you are testing a skill or that you already suspect a bug.
 
 ## Annotation Rules
 
-- Annotate only when you can explain the failure mode clearly.
+- Annotate only when you are confident the step will cause a concrete problem if followed as written.
 - Keep each `[Model name]` note short and operational.
 - Prefer one strong fix over a menu of options.
 - Place the note as close as possible to the flawed text.
-- Do not annotate a section just because it could be more detailed.
+- Do not annotate a section just because it could be more detailed, better worded, or missing "nice to have" steps.
 - If the user provided a path to a markdown file, edit that file. If the user pasted markdown inline, return the annotated markdown inline.
+- A plan with zero annotations is a valid outcome. It means the plan is sound.
 
 ## Example
 
