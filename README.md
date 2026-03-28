@@ -6,6 +6,8 @@ A collection of Claude Code skills for coding agents.
 
 | Skill | Description | Source |
 |-------|-------------|--------|
+| [data-pipeline-drift](./data-pipeline-drift) | Detect data drift in parquet pipeline outputs across partitions or environments | — |
 | [excalidraw-diagram](./excalidraw-diagram) | Create Excalidraw diagram JSON files that make visual arguments | Improved from [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
-| [grill-me](./grill-me) | Interview relentlessly about a plan or design until reaching shared understanding | Improved from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/grill-me/SKILL.md) |
-| [review-markdown-plan](./review-markdown-plan) | Review a premade markdown plan by section using subagents to validate each step | — |
+| [get-feedback-markdown-plan](./get-feedback-markdown-plan) | Evaluate inline feedback annotations on a markdown plan by verifying each critique (feedback from [review-markdown-plan](./review-markdown-plan)) | — |
+| [grill-me](./grill-me) | Structured interview about a plan or design, walking each branch of the decision tree | Improved from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/grill-me/SKILL.md) |
+| [review-markdown-plan](./review-markdown-plan) | Review other agent's plan by section, annotating only concretely wrong steps | — |
