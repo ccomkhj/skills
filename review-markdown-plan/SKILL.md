@@ -1,5 +1,6 @@
 ---
 name: review-markdown-plan
+version: 1.0.0
 description: Review a premade markdown plan by section, using subagents to independently validate each section or step and then annotating the plan with concrete inline fixes. Use when a user provides a written plan, implementation plan, migration plan, rollout plan, or checklist in markdown and asks Codex to critique it, pressure-test the steps, or rewrite flawed sections with `[Model name]` notes that explain what is wrong and how to fix it.
 ---
 

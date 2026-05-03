@@ -1,5 +1,6 @@
 ---
 name: organize-skill-mcp
+version: 1.0.0
 description: "ONLY trigger when the user explicitly types /organize-skill-mcp. Scans all skill installations and MCP server configs across Claude Code, Claude Desktop, Cursor, Windsurf, Codex, and Gemini CLI at global and project scopes. Visualizes the current state, detects issues (duplicates, broken symlinks, security risks, inconsistencies), and suggests cleanup actions."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: data-pipeline-drift
+version: 1.0.0
 description: "ONLY trigger when the user explicitly types /data-pipeline-drift. Detects data drift in parquet pipeline outputs across ds= partitions or environments by exploring the actual data, then diagnoses root causes."
 ---
 
