@@ -9,6 +9,13 @@
 #   Agent-side (called inside a round):
 #     consult_handoff <peer>        — fire the peer headless, log to .consult/round-N-<peer>.log
 #                                      AND append to .consult/session.log for live tailing.
+#     consult_wait                  — block until STATE.md flips off 'WAITING: <peer>'.
+#                                      MUST be called after consult_handoff (the nohup'd peer
+#                                      is invisible to the Claude-Code harness, so without
+#                                      this poll the agent has no way to learn the peer is
+#                                      done). In Claude Code, invoke via Bash with
+#                                      run_in_background=true so the harness notifies the
+#                                      agent the instant the wait returns.
 #     consult_peer_status <peer>    — list running peer PIDs (do NOT killall by name).
 #
 #   Human-side:
@@ -116,6 +123,105 @@ consult_handoff() {
   disown
 
   echo "consult_handoff: invoked $peer for round $round (pid $pid, log $logfile, live: consult_watch)"
+  echo "consult_handoff: NEXT — call 'consult_wait' (Bash run_in_background=true in Claude Code)."
+  echo "                 The peer is nohup'd and invisible to the harness; without consult_wait you will idle."
+}
+
+# consult_wait — block until STATE.md flips off 'WAITING: <peer>'.
+#
+# Why this exists: consult_handoff fires the peer via `nohup ... &`, which
+# detaches it from the Claude-Code harness's process tracking. The harness
+# therefore has no way to surface "peer is done" to the active agent — the
+# agent would sit idle until the user happens to ping (which triggers a
+# file-change reminder) or a manual ScheduleWakeup fires.
+#
+# consult_wait closes that gap by polling .consult/STATE.md. When invoked via
+# Bash with run_in_background=true (Claude Code), the harness DOES track the
+# wait-process, so the agent gets notified the instant this function returns.
+# In Codex CLI or other contexts without run_in_background, call inline — it
+# blocks the current turn until the peer's round lands (or timeout).
+#
+# Usage:
+#   consult_wait                    # default: 5s poll, 540s max wait
+#   consult_wait --interval 3
+#   consult_wait --timeout 300
+#
+# Exit codes:
+#   0  STATUS changed off 'WAITING: <peer>' — your turn (or session done/blocked).
+#   2  Timed out. Re-invoke, or run consult_status to investigate.
+#   3  Peer process died without writing the round file (lsof+mtime heuristic).
+consult_wait() {
+  local interval=5
+  local timeout=540
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --interval) interval="$2"; shift 2 ;;
+      --timeout)  timeout="$2";  shift 2 ;;
+      -h|--help)
+        echo "Usage: consult_wait [--interval SECONDS] [--timeout SECONDS]"
+        return 0
+        ;;
+      *) echo "consult_wait: unknown arg '$1'" >&2; return 2 ;;
+    esac
+  done
+
+  if [[ ! -f .consult/STATE.md ]]; then
+    echo "consult_wait: no .consult/STATE.md in $(pwd)" >&2
+    return 2
+  fi
+
+  # Use awk to both detect and extract — keeps the function portable across
+  # bash and zsh (zsh has no BASH_REMATCH, and `status` is a read-only
+  # special variable, so we use `cur_status` below).
+  local initial peer
+  initial=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); print; exit}' .consult/STATE.md)
+  peer=$(awk '/^STATUS:[[:space:]]*WAITING:/ {sub(/^STATUS:[[:space:]]*WAITING:[[:space:]]*/,""); print; exit}' .consult/STATE.md)
+  if [[ -z "$peer" ]]; then
+    echo "consult_wait: STATUS is '$initial' (not 'WAITING: <peer>'). Nothing to wait for — act now."
+    return 0
+  fi
+
+  local round
+  round=$(awk '/^ROUND:/ {print $2; exit}' .consult/STATE.md)
+  local round_log=".consult/round-${round}-${peer}.log"
+
+  echo "consult_wait: polling STATE.md every ${interval}s for status change off 'WAITING: ${peer}' (timeout ${timeout}s)..."
+
+  local elapsed=0
+  while (( elapsed < timeout )); do
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+
+    # Init to "" — declaring a bare `local` inside a loop causes zsh to print
+    # the variable each iteration (zsh's `local` is `typeset`, which echoes
+    # parameter state in some forms).
+    local cur_status=""
+    cur_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); print; exit}' .consult/STATE.md 2>/dev/null)
+    if [[ "$cur_status" != "WAITING: $peer" ]]; then
+      echo "consult_wait: STATUS is now '$cur_status' after ${elapsed}s — your turn."
+      return 0
+    fi
+
+    # Crash heuristic: after a few polls, if no process holds the round log
+    # open AND the file hasn't been touched in 3*interval seconds, the peer
+    # likely died (segfault, OOM, network drop on `claude -p`, etc.).
+    if (( elapsed >= interval * 3 )) && [[ -f "$round_log" ]] && command -v lsof >/dev/null 2>&1; then
+      if ! lsof -t "$round_log" >/dev/null 2>&1; then
+        local log_mtime now stale
+        log_mtime=$(stat -f %m "$round_log" 2>/dev/null || stat -c %Y "$round_log" 2>/dev/null)
+        now=$(date +%s)
+        stale=$((now - log_mtime))
+        if (( stale > interval * 3 )); then
+          echo "consult_wait: no process writing $round_log and last write was ${stale}s ago — peer may have died." >&2
+          echo "              Run 'consult_status' / 'consult_peer_status ${peer}' to investigate." >&2
+          return 3
+        fi
+      fi
+    fi
+  done
+
+  echo "consult_wait: timed out after ${timeout}s (STATUS still 'WAITING: ${peer}'). Re-run consult_wait or check 'consult_status'." >&2
+  return 2
 }
 
 consult_peer_status() {

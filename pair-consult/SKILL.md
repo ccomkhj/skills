@@ -11,20 +11,22 @@ You were invoked via `codex exec` or `claude -p` with *"Resume the pair-consult 
 
 1. `cat .consult/STATE.md .consult/QUESTION.md` — orient.
 2. Confirm `STATUS: WAITING: <you>` and read `ROUND:`. Your role is fixed by the round (table below).
-3. Write `R<ROUND>.md`, update `STATE.md`, hand off OR finish.
+3. Write `R<ROUND>.md`, update `STATE.md`, hand off (`consult_handoff <peer>` + `consult_wait`) OR finish.
 4. **R5 ends the loop** — do not invoke the peer; surface to the user.
+
+**After every `consult_handoff` you MUST also call `consult_wait`** — the peer is `nohup`'d and the harness can't see it, so without `consult_wait` you will idle. See [Handoff](#handoff) below.
 
 No session memory across turns. State lives in `.consult/`. Templates for every file are in [reference/file-formats.md](reference/file-formats.md).
 
 ## Overview
 
-| Round | Actor | Action | Output |
-|---|---|---|---|
-| **R1** | A | Propose | `R1.md` (+ code in repo if coding) |
-| **R2** | B | Review proposal | `R2.md` (agreements + numbered critiques) |
-| **R3** | A | Respond per critique (agree/partial/object) | `R3.md` |
-| **R4** | B | Re-review (accept/double-down) | `R4.md` |
-| **R5** | A | Synthesize, ask user | `R5.md` — user reads this |
+| Round | Actor | Action | Output | After |
+|---|---|---|---|---|
+| **R1** | A | Propose | `R1.md` (+ code in repo if coding) | `consult_handoff B` + `consult_wait` |
+| **R2** | B | Review proposal | `R2.md` (agreements + numbered critiques) | `consult_handoff A` + `consult_wait` |
+| **R3** | A | Respond per critique (agree/partial/object) | `R3.md` | `consult_handoff B` + `consult_wait` |
+| **R4** | B | Re-review (accept/double-down) | `R4.md` | `consult_handoff A` + `consult_wait` |
+| **R5** | A | Synthesize, ask user | `R5.md` — user reads this | stop — `STATUS: AWAITING_USER` |
 
 After R5, `STATUS: AWAITING_USER` and the loop stops. The user's reply (confirm / redirect / cancel) closes the session.
 
@@ -123,6 +125,28 @@ consult_handoff codex                                        # or: consult_hando
 
 `consult_handoff` does the headless invocation correctly (nohup + detach, `--` terminator for claude, `stdbuf` for live logging). Do not call this at R5 — the function will refuse and tell you to set `STATUS: AWAITING_USER`.
 
+### Then wait — the handoff isn't tracked by the harness
+
+`consult_handoff` uses `nohup ... &` to detach the peer, which **takes it outside the Claude Code harness's process tracking**. The harness will NOT notify you when the peer's round lands. If you simply end your turn after `consult_handoff`, you will sit idle until the user pings (which surfaces a file-change reminder) or until a `ScheduleWakeup` fires — both unreliable and high-latency.
+
+The fix: **immediately after `consult_handoff`, call `consult_wait`** so the harness has something to track:
+
+```
+# Claude Code (this is the important case):
+Bash(
+  command="source ~/.claude/skills/pair-consult/reference/handoff.sh && consult_wait",
+  run_in_background=true,
+)
+# Codex CLI / inline: call consult_wait in the foreground — it will block until the peer flips STATE.md.
+```
+
+`consult_wait` polls `.consult/STATE.md` every 5s and exits the moment the STATUS line flips off `WAITING: <peer>`. When invoked via `Bash(run_in_background=true)`, the harness tracks the poll-process and notifies you on exit — you learn about R<N+1> at file-write time, not at next-user-ping time.
+
+Behavior on exit:
+- **Exit 0** — your turn. Read the new round file, surface a digest, do your round.
+- **Exit 2** — timeout (default 540s, just under Bash's 600s ceiling). Re-invoke `consult_wait`. A peer round legitimately taking >9 min is rare but possible (large code reviews, slow networks).
+- **Exit 3** — the peer likely crashed (no process holds the round log open and the file is stale). Run `consult_status` and `consult_peer_status <peer>` to investigate before retrying.
+
 ## Hazards
 
 All guarded by `consult_handoff` — listed here so you don't reinvent them.
@@ -157,6 +181,8 @@ While the loop runs:
 | Invoking peer at R5 | R5 ends the loop. Surface to user. |
 | R5 hides unresolved tensions | Surface them plainly. Let the user decide. |
 | Running consult alongside `.pair/` in the same repo | One session per repo. If both exist, abort `STATUS: BLOCKED: collision-with-pair-coding`. |
+| Idling after `consult_handoff` ("harness will notify me") | It won't — the peer is `nohup`'d, outside harness tracking. Always follow `consult_handoff` with `consult_wait` (via `Bash(run_in_background=true)` in Claude Code) so the harness has a tracked process to notify on. |
+| Telling the user "I'll wait for the peer" with no scheduled wakeup or background wait | Same root cause as above. The wait must be a real tracked process, not an intention. |
 
 ## Resuming
 
