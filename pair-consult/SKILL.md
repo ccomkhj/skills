@@ -1,6 +1,6 @@
 ---
 name: pair-consult
-description: ONLY trigger when the user explicitly types /pair-consult, or when invoked by the peer agent via a "Resume the pair-consult skill" prompt. Do NOT auto-trigger otherwise. Bounded 5-round consultation between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when /pair-coding's spec→plan→code ceremony is too heavy and the user wants a tighter back-and-forth ending in user confirmation.
+description: Bounded 5-round consultation between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when /pair-coding's spec→plan→code ceremony is too heavy and the user wants a tighter back-and-forth ending in user confirmation.
 ---
 
 # pair-consult

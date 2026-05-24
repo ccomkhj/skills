@@ -1,6 +1,6 @@
 ---
 name: simple-llm-wiki
-description: "ONLY trigger when the user explicitly types /simple-llm-wiki. Do NOT auto-trigger based on context. Use when building or maintaining a personal LLM-powered knowledge base. Provides Ingest, Query, and Lint operations over a raw/ + wiki/ directory pair."
+description: "Use when building or maintaining a personal LLM-powered knowledge base. Provides Ingest, Query, and Lint operations over a raw/ + wiki/ directory pair."
 ---
 
 # Simple LLM Wiki

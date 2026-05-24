@@ -1,7 +1,7 @@
 ---
 name: analyze-git-style
 version: 1.0.0
-description: "ONLY trigger when the user explicitly types /analyze-git-style. Analyzes git commit and push history across ALL repositories on the machine, scores commit message quality, and generates a CLI report with statistics, lessons, and improvement suggestions. Supports --today and --week time filters."
+description: "Analyzes git commit and push history across ALL repositories on the machine, scores commit message quality, and generates a CLI report with statistics, lessons, and improvement suggestions. Supports --today and --week time filters."
 ---
 
 # Analyze Git Style

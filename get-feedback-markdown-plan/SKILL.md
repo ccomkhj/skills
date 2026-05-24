@@ -1,7 +1,7 @@
 ---
 name: get-feedback-markdown-plan
 version: 1.0.0
-description: "ONLY trigger when the user explicitly types /get-feedback-markdown-plan. Evaluates inline feedback annotations on a markdown plan by verifying each critique against the codebase and context using subagents."
+description: "Evaluates inline feedback annotations on a markdown plan by verifying each critique against the codebase and context using subagents."
 ---
 
 # Get Feedback on Markdown Plan

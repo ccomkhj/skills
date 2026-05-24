@@ -1,6 +1,6 @@
 ---
 name: pair-coding
-description: ONLY trigger when the user explicitly types /pair-coding, or when invoked by the peer agent via a "Resume the pair-coding skill" prompt. Do NOT auto-trigger otherwise. Coordinates a pair-programming session between Claude Code and Codex on the same task — each agent proposes (spec, plan, code), the peer reviews, and shared state lives in `.pair/`. Use when the user wants two AI agents to mutually review each other's work end-to-end, not just final code.
+description: Coordinates a pair-programming session between Claude Code and Codex on the same task — each agent proposes (spec, plan, code), the peer reviews, and shared state lives in `.pair/`. Use when the user wants two AI agents to mutually review each other's work end-to-end, not just final code.
 ---
 
 # pair-coding

@@ -1,6 +1,6 @@
 ---
 name: grill-with-llm-wiki
-description: "ONLY trigger when the user explicitly types /grill-with-llm-wiki. Do NOT auto-trigger based on context. Stress-tests a plan or idea by challenging it against an existing LLM-maintained wiki (entity / concept articles, index, log, raw sources). Read-only — never writes to the wiki."
+description: "Stress-tests a plan or idea by challenging it against an existing LLM-maintained wiki (entity / concept articles, index, log, raw sources). Read-only — never writes to the wiki."
 ---
 
 You are conducting a structured design interview that uses an LLM-maintained wiki as the source of truth. The wiki is a persistent, compounding knowledge base of markdown articles — your job is to surface tensions between the user's plan and what the wiki already records.
