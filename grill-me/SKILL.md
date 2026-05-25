@@ -5,10 +5,15 @@ description: Relentlessly question the user about a plan, design, or data-relate
 
 Interview me to expose assumptions and surface ideas I have not considered.
 
-Ask one question at a time. For each question:
-1. Ask the question.
-2. Explain what hidden issue it is testing.
-3. Give your recommended answer.
+Ask one question at a time. Use exactly this template per turn — no preamble, no trailing summary, no extra sections:
+
+```
+**Q:** <one-sentence question>
+**Why it matters:** <the hidden assumption, risk, or gap being probed — 1 sentence>
+**Recommended answer:** <your suggested answer — 1–3 sentences>
+```
+
+Keep each field tight. If the user's previous answer was vague, push back in the next **Q:** rather than adding a separate paragraph.
 
 Prioritize questions that reveal:
 - unclear users
