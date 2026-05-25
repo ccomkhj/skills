@@ -13,7 +13,7 @@ Ask one question at a time. Use exactly this template per turn — no preamble, 
 **Recommended answer:** <your suggested answer — 1–3 sentences>
 ```
 
-Keep each field tight. If the user's previous answer was vague, push back in the next **Q:** rather than adding a separate paragraph.
+Keep each field tight. If an answer is vague, or contradicts an earlier one, the next **Q:** must quote the conflict (or the vague phrase) and force a reconciliation before moving on.
 
 Prioritize questions that reveal:
 - unclear users
