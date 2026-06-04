@@ -7,14 +7,14 @@ description: Bounded 5-round consultation between Claude Code and Codex on a sin
 
 ## TL;DR for a cold-woken peer
 
-You were invoked via `codex exec` or `claude -p` with *"Resume the pair-consult skill. Read .consult/STATE.md..."*. Do this:
+You were invoked via `codex exec` or `claude -p` with *"Resume the pair-consult skill. Read .consult/STATE.md..."*. You are a **one-shot peer**: you do exactly ONE round (R2 or R4) and exit. Do this:
 
-1. `cat .consult/STATE.md .consult/QUESTION.md` — orient.
+1. `cat .consult/STATE.md .consult/QUESTION.md .consult/USER_NOTES.md` — orient.
 2. Confirm `STATUS: WAITING: <you>` and read `ROUND:`. Your role is fixed by the round (table below).
-3. Write `R<ROUND>.md`, update `STATE.md`, hand off (`consult_handoff <peer>` + `consult_wait`) OR finish.
-4. **R5 ends the loop** — do not invoke the peer; surface to the user.
+3. Write `R<ROUND>.md`, then update `STATE.md`: set `STATUS: WAITING: <orchestrator>` and bump `ROUND`.
+4. **EXIT. Do NOT call `consult_handoff` or `consult_wait`.** The orchestrator (the interactive session that woke you) is already blocked in `consult_wait` and resumes the instant you flip `STATE.md`. If you hand off, you spawn a **duplicate orchestrator** — two instances then write the same round and collide on `STATE.md`. This is the bug. Don't be it.
 
-**After every `consult_handoff` you MUST also call `consult_wait`** — the peer is `nohup`'d and the harness can't see it, so without `consult_wait` you will idle. See [Handoff](#handoff) below.
+**You never do R5.** R5 is always the orchestrator's. Only the orchestrator runs `consult_handoff` + `consult_wait`; see [Two roles](#two-roles) and [Handoff](#handoff).
 
 No session memory across turns. State lives in `.consult/`. Templates for every file are in [reference/file-formats.md](reference/file-formats.md).
 
@@ -22,13 +22,24 @@ No session memory across turns. State lives in `.consult/`. Templates for every 
 
 | Round | Actor | Action | Output | After |
 |---|---|---|---|---|
-| **R1** | A | Propose | `R1.md` (+ code in repo if coding) | `consult_handoff B` + `consult_wait` |
-| **R2** | B | Review proposal | `R2.md` (agreements + numbered critiques) | `consult_handoff A` + `consult_wait` |
-| **R3** | A | Respond per critique (agree/partial/object) | `R3.md` | `consult_handoff B` + `consult_wait` |
-| **R4** | B | Re-review (accept/double-down) | `R4.md` | `consult_handoff A` + `consult_wait` |
-| **R5** | A | Synthesize, ask user | `R5.md` — user reads this | stop — `STATUS: AWAITING_USER` |
+| **R1** | A (orchestrator) | Propose | `R1.md` (+ code in repo if coding) | flip `WAITING: B` → `consult_handoff B` + `consult_wait` |
+| **R2** | B (peer, one-shot) | Review proposal | `R2.md` (agreements + numbered critiques) | flip `WAITING: A` → **exit** (no handoff, no wait) |
+| **R3** | A (orchestrator) | Respond per critique (agree/partial/object) | `R3.md` | flip `WAITING: B` → `consult_handoff B` + `consult_wait` |
+| **R4** | B (peer, one-shot) | Re-review (accept/double-down) | `R4.md` | flip `WAITING: A` → **exit** (no handoff, no wait) |
+| **R5** | A (orchestrator) | Synthesize, ask user | `R5.md` — user reads this | stop — `STATUS: AWAITING_USER` |
 
 After R5, `STATUS: AWAITING_USER` and the loop stops. The user's reply (confirm / redirect / cancel) closes the session.
+
+## Two roles
+
+The loop has an **asymmetry that prevents duplicate instances** — internalize it before anything else.
+
+- **Orchestrator = A** = the interactive session that ran `/pair-consult`. It is alive for the whole session. It does R1, R3, R5. After R1 and R3 it spawns the peer (`consult_handoff B`) and blocks in `consult_wait` until the peer flips `STATE.md` back. After R5 it stops.
+- **Peer = B** = a *fresh, headless, one-shot* instance, cold-woken by the orchestrator's `consult_handoff`. It does exactly one round (R2 or R4), flips `STATUS: WAITING: A`, and **exits**. It never calls `consult_handoff` and never calls `consult_wait`.
+
+**Why:** `consult_handoff` always *spawns a new instance* of the named peer. If the peer (B) hands back with `consult_handoff A`, it spawns a **second A** — while the original orchestrator A is still alive in `consult_wait`. Both then see `WAITING: A`, both act, both write the round, and they collide on `STATE.md` (`Error editing file`). The only safe shape is: **only the orchestrator hands off and waits; the peer flips-and-exits.** A peer that is alive does not need to be re-spawned — it's already waiting.
+
+So `consult_handoff` + `consult_wait` are **orchestrator-only** verbs. If you were cold-woken by a resume prompt, you are the peer: flip and exit.
 
 ## When to use
 
@@ -44,9 +55,9 @@ After R5, `STATUS: AWAITING_USER` and the loop stops. The user's reply (confirm 
 Each round is narrow on purpose. Stay in your lane. **Templates for each round file are in [reference/file-formats.md](reference/file-formats.md);** the semantics are below.
 
 - **R1 (A proposes).** Read `QUESTION.md`. For coding tasks, write the actual code in the repo, run the test, then write `R1.md` as the design rationale (not a code dump).
-- **R2 (B reviews).** Read `R1.md` and (for coding) `git diff` + run the tests yourself. Open numbered critiques in `R2.md` — do **not** edit A's artifacts. Your critiques drive A's next round.
+- **R2 (B reviews).** Read `R1.md` and (for coding) `git diff` + run the tests yourself. Open numbered critiques in `R2.md` — do **not** edit A's artifacts. Your critiques drive A's next round. Then flip `STATUS: WAITING: A`, bump `ROUND`, and **exit** — you are one-shot; do not hand off.
 - **R3 (A responds).** For each numbered critique, write a verdict (`agree` / `partial` / `object`), the action you took, and reasoning when not pure agreement. Address **every** critique — skipping one is a bug. If you applied code changes, re-run the test and note the result in the relevant C-block.
-- **R4 (B re-reviews).** For each item where A objected or partial-applied, decide `accept` or `double down`. **No fresh critiques** — bugs A introduced in R3 are double-downs with a sub-finding, not new Cs. R4 is B's last word.
+- **R4 (B re-reviews).** For each item where A objected or partial-applied, decide `accept` or `double down`. **No fresh critiques** — bugs A introduced in R3 are double-downs with a sub-finding, not new Cs. R4 is B's last word. Then flip `STATUS: WAITING: A`, set `ROUND: 5`, and **exit** — do not hand off (A is already waiting and writes R5).
 - **R5 (A synthesizes).** Write the user-facing close: what we landed on, where we agreed, unresolved tensions plainly stated, what we need from the user. Then `STATUS: AWAITING_USER` and stop.
 
 ### Early termination — skip ahead when there's consensus
@@ -100,7 +111,7 @@ Create `.consult/` at the repo root on init and append `.consult/` to `.gitignor
 ## Entry modes
 
 ### Mode 1 — fresh question: `/pair-consult "<question>"`
-Standard init. Write `QUESTION.md` and `STATE.md` (`ROUND: 1`, `STATUS: ACTIVE: <you>`, `A: <you>`, `B: <peer>`), then do R1 as described in the Round protocol. After R1, `ROUND: 2`, `STATUS: WAITING: <peer>`, `consult_handoff <peer>`.
+Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` (`ROUND: 1`, `STATUS: ACTIVE: <you>`, `A: <you>`, `B: <peer>`), then do R1 as described in the Round protocol. After R1, `ROUND: 2`, `STATUS: WAITING: <peer>`, then `consult_handoff <peer>` + `consult_wait` and stay alive for R3/R5.
 
 ### Mode 2 — continue from session: `/pair-consult --from-session`
 **Use when you're mid-conversation with the user and you've just proposed something** — code, an approach, a decision — and the user wants the peer to grill it. You are implicitly A; your most-recent proposal becomes R1 content.
@@ -108,7 +119,7 @@ Standard init. Write `QUESTION.md` and `STATE.md` (`ROUND: 1`, `STATUS: ACTIVE: 
 1. Write `QUESTION.md` from the user's recent turn — include enough context that B can act cold (B does NOT see chat history; only `.consult/`).
 2. Write `R1.md` by summarizing your most-recent proposal — don't restate the conversation, extract the proposal into the R1 template.
 3. `STATE.md`: `ROUND: 2`, `STATUS: WAITING: <peer>`, `A: <you>`, `B: <peer>`. Round-log starts with the R1 row noting `from-session`.
-4. `consult_handoff <peer>` — B does R2.
+4. `consult_handoff <peer>` + `consult_wait` — B does R2 (one-shot) and flips back; your `consult_wait` resumes you for R3.
 
 **Auto-detect Mode 2:** when `/pair-consult` is invoked with no question argument AND no existing `.consult/` AND the recent conversation contains a proposal you authored, default to Mode 2 without requiring `--from-session` explicitly. Otherwise prompt the user for a question.
 
@@ -116,7 +127,9 @@ If `.consult/` already exists, **don't overwrite** — treat as resume; show `co
 
 ## Handoff
 
-After writing your round and updating `STATE.md`:
+**`consult_handoff` + `consult_wait` are orchestrator-only.** You run them only after *your own* round as A (R1, R3) — never as a cold-woken peer (see [Two roles](#two-roles)). A peer flips `STATE.md` and exits; the orchestrator's existing `consult_wait` picks it up.
+
+After writing your round (as the orchestrator) and updating `STATE.md`:
 
 ```bash
 source ~/.claude/skills/pair-consult/reference/handoff.sh   # or ~/.agents/...
@@ -178,6 +191,7 @@ While the loop runs:
 | Doing more than one round's work in a turn | R1 proposes, doesn't preempt R2. R2 critiques, doesn't rewrite A's code. |
 | Skipping critiques in R3 | Address every numbered critique. Even `object` is an answer. |
 | Adding new critiques in R4 | R4 is `accept` / `double down` only. New bugs from R3 are double-downs with sub-findings. |
+| Peer (B) calling `consult_handoff`/`consult_wait` after R2 or R4 | This spawns a **duplicate orchestrator** that races the live one — two instances write the same round and collide on `STATE.md` (`Error editing file`). The peer is one-shot: flip `STATUS: WAITING: A` and **exit**. Only A hands off and waits. See [Two roles](#two-roles). |
 | Invoking peer at R5 | R5 ends the loop. Surface to user. |
 | R5 hides unresolved tensions | Surface them plainly. Let the user decide. |
 | Running consult alongside `.pair/` in the same repo | One session per repo. If both exist, abort `STATUS: BLOCKED: collision-with-pair-coding`. |
