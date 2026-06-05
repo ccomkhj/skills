@@ -4,3 +4,4 @@ __pycache__/
 .claude/settings.local.json
 .DS_Store
 .consult/
+.optimize/
