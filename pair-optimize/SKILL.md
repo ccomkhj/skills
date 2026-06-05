@@ -129,7 +129,7 @@ Use when you've just profiled/proposed an optimization mid-conversation and want
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--number n` (alias `--rounds n`) | Requested **round cap / depth**, written to `ROUNDS:` (a max — early termination can end sooner). **Normalized to odd and `>= 3`**: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason before the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` | `5` |
+| `--number n` (aliases `--rounds n`, `--round n`) | Requested **round cap / depth**, written to `ROUNDS:` (a max — early termination can end sooner). **Normalized to odd and `>= 3`**: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason before the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` | `5` |
 | `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `optimize_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Only `high`/`xhigh` accepted; an invalid value should abort before writing `.optimize/`. Omitted → empty `EFFORT:`, each CLI's own default. | unset |
 
 ## Handoff
