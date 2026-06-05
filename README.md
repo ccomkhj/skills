@@ -13,9 +13,17 @@ My personal skills.
 | [grill-with-llm-wiki](./grill-with-llm-wiki) | 1.0.0 | Stress-tests a plan against an existing LLM-maintained wiki (articles, index, log, raw sources). Read-only companion to [simple-llm-wiki](./simple-llm-wiki) | — |
 | [organize-skill-mcp](./organize-skill-mcp) | 1.0.0 | Scan all skill and MCP server configurations across Claude Code, Claude Desktop, Cursor, Windsurf, Codex, and Gemini CLI — global and per-project — and suggest cleanup | — |
 | [pair-coding](./pair-coding) | 1.0.0 | Coordinate a Claude Code ↔ Codex pair-programming session with mutual review at every stage (spec, plan, each code step) via shared `.pair/` files | — |
-| [pair-consult](./pair-consult) | 1.0.0 | Bounded 5-round Claude ↔ Codex consultation on one question — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks user. Lighter sibling to [pair-coding](./pair-coding) | — |
+| [pair-consult](./pair-consult) | 1.1.0 | Bounded Claude ↔ Codex consultation on one question — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks user. Round count and peer effort configurable. Lighter sibling to [pair-coding](./pair-coding) | — |
 | [review-markdown-plan](./review-markdown-plan) | 1.0.0 | Review other agent's plan by section, annotating only concretely wrong steps | — |
 | [simple-llm-wiki](./simple-llm-wiki) | 1.0.0 | Build and maintain a personal LLM-powered knowledge base (Ingest / Query / Lint) over a raw/ + wiki/ directory pair | Adapted from [astro-han/karpathy-llm-wiki](https://github.com/astro-han/karpathy-llm-wiki) |
+
+### pair-consult flags
+
+```
+/pair-consult "<question>"                       # default: 5 rounds
+/pair-consult "<question>" --number 7            # n rounds (odd, ≥3)
+/pair-consult "<question>" --model high|xhigh    # peer reasoning effort
+```
 
 ## Install
 
