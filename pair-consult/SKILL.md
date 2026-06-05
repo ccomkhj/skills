@@ -10,7 +10,7 @@ description: Bounded multi-round consultation (default 5 rounds, set with --numb
 You were invoked via `codex exec` or `claude -p` with *"Resume the pair-consult skill. Read .consult/STATE.md..."*. You are a **one-shot peer**: you do exactly ONE round (an even round — R2, R4, …) and exit. Do this:
 
 1. `cat .consult/STATE.md .consult/QUESTION.md .consult/USER_NOTES.md` — orient.
-2. Confirm `STATUS: WAITING: <you>` and read `ROUND:` + `ROUNDS:`. You are B, so this round is a review: a *re-review* (R4-style, accept/double-down) if `ROUND == ROUNDS-1`, otherwise a fresh-critique review (R2-style). See [Round protocol](#round-protocol--one-allowed-action-per-round).
+2. Confirm `STATUS: WAITING: <you>` and read `ROUND:` + `ROUNDS:`. You are B, so this round is a review — a fresh-critique review (R2-style) of A's latest proposal/response by default. It's a *re-review* (R4-style, accept/double-down) **only when `ROUNDS >= 5` and `ROUND == ROUNDS-1`** (the last B round, which follows an A-response). At `n=3` there's no A-response round, so the single B round is always a fresh review. See [Round protocol](#round-protocol--one-allowed-action-per-round).
 3. Write `R<ROUND>.md`, then update `STATE.md`: set `STATUS: WAITING: <orchestrator>` and bump `ROUND`.
 4. **EXIT. Do NOT call `consult_handoff` or `consult_wait`.** The orchestrator (the interactive session that woke you) is already blocked in `consult_wait` and resumes the instant you flip `STATE.md`. If you hand off, you spawn a **duplicate orchestrator** — two instances then write the same round and collide on `STATE.md`. This is the bug. Don't be it.
 
@@ -20,7 +20,7 @@ No session memory across turns. State lives in `.consult/`. Templates for every 
 
 ## Overview
 
-The default session is **5 rounds**. `--number n` sets a different total (`ROUNDS:` in `STATE.md`); see [Flags](#flags). The 5-round shape:
+The default session is **5 rounds**. `--number n` sets the **round cap** (`ROUNDS:` in `STATE.md`) — a max, since [early termination](#early-termination--skip-ahead-when-theres-consensus) can finish sooner; see [Flags](#flags). The 5-round shape:
 
 | Round | Actor | Action | Output | After |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ The default session is **5 rounds**. `--number n` sets a different total (`ROUND
 | **R4** | B (peer, one-shot) | Re-review (accept/double-down) | `R4.md` | flip `WAITING: A` → **exit** (no handoff, no wait) |
 | **R5** | A (orchestrator) | Synthesize, ask user | `R5.md` — user reads this | stop — `STATUS: AWAITING_USER` |
 
-**General rule for any odd `n` (`ROUNDS`):** round 1 = A proposes; the final round `n` = A synthesizes (`AWAITING_USER`); interior rounds alternate — **even rounds = B reviews, odd rounds = A responds**. `n` is always odd (forced at init) so A is both the first proposer and the last synthesizer. At `n=5` this is exactly the table above; at `n=7` it's propose · review · respond · review · respond · re-review · synthesize.
+**General rule for any odd `n` (`ROUNDS`):** round 1 = A proposes; the final round `n` = A synthesizes (`AWAITING_USER`); interior rounds alternate — **even rounds = B reviews, odd rounds = A responds**. `n` is always odd (forced at init) so A is both the first proposer and the last synthesizer. At `n=3` it's propose · review · synthesize (one B round, a fresh review — no re-review); at `n=5` it's exactly the table above; at `n=7` it's propose · review · respond · review · respond · re-review · synthesize.
 
 After the final round, `STATUS: AWAITING_USER` and the loop stops. The user's reply (confirm / redirect / cancel) closes the session.
 
@@ -61,7 +61,7 @@ Each round is narrow on purpose. Stay in your lane. **Templates for each round f
 - **Propose (round 1, A).** Read `QUESTION.md`. For coding tasks, write the actual code in the repo, run the test, then write `R1.md` as the design rationale (not a code dump).
 - **Review (even rounds, B).** Read the latest `R*.md` and (for coding) `git diff` + run the tests yourself. Open numbered critiques in `R<round>.md` — do **not** edit A's artifacts. Your critiques drive A's next round. Then flip `STATUS: WAITING: A`, bump `ROUND`, and **exit** — you are one-shot; do not hand off.
 - **Respond (odd interior rounds, A).** For each numbered critique, write a verdict (`agree` / `partial` / `object`), the action you took, and reasoning when not pure agreement. Address **every** critique — skipping one is a bug. If you applied code changes, re-run the test and note the result in the relevant C-block.
-- **Re-review (round `n-1`, the last B round).** For each item where A objected or partial-applied, decide `accept` or `double down`. **No fresh critiques** — bugs A introduced in the prior round are double-downs with a sub-finding, not new Cs. This is B's last word. Then flip `STATUS: WAITING: A`, set `ROUND: <n>`, and **exit** — do not hand off (A is already waiting and writes the final round).
+- **Re-review (round `n-1`, the last B round — only when `n >= 5`).** Exists only when a preceding A-response round feeds it, so **never at `n=3`** (there the one B round is a fresh review). For each item where A objected or partial-applied, decide `accept` or `double down`. **No fresh critiques** — bugs A introduced in the prior round are double-downs with a sub-finding, not new Cs. This is B's last word. Then flip `STATUS: WAITING: A`, set `ROUND: <n>`, and **exit** — do not hand off (A is already waiting and writes the final round).
 - **Synthesize (round `n`, A).** Write the user-facing close: what we landed on, where we agreed, unresolved tensions plainly stated, what we need from the user. Then `STATUS: AWAITING_USER` and stop.
 
 ### Early termination — skip ahead when there's consensus
@@ -131,7 +131,7 @@ Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` 
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--number n` (alias `--rounds n`) | Total rounds for the session, written to `ROUNDS:`. **Must be odd and `>= 3`** so A both proposes and synthesizes. If the user gives an even `n`, **snap up to `n+1`** and tell them; if `n < 3`, raise to 3 and tell them. Larger `n` = longer wall-clock (each round is a fresh peer cold-start), so flag very large values to the user. | `5` |
+| `--number n` (alias `--rounds n`) | Requested **round cap / depth**, written to `ROUNDS:` — it's a max ([early termination](#early-termination--skip-ahead-when-theres-consensus) can end sooner). **Normalized to odd and `>= 3`** so A both proposes and synthesizes: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason *before* the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` Larger `n` = longer wall-clock (each round is a fresh peer cold-start), so flag very large values. | `5` |
 | `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `consult_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Omitted → empty `EFFORT:`, each CLI uses its own default. | unset |
 
 Note: only `high` and `xhigh` are accepted. Your `~/.codex/config.toml` may already default codex to `xhigh`, so `--model xhigh` is often a no-op for the codex peer; `--model high` is what visibly steps it down.

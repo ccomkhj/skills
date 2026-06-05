@@ -25,7 +25,7 @@ Updated by the actor at the end of every round.
 
 STATUS: WAITING: codex     # WAITING: claude | WAITING: codex | AWAITING_USER | BLOCKED: <reason>
 ROUND: 2
-ROUNDS: 5                  # total rounds this session — odd, >=3, default 5; fixed for the session
+ROUNDS: 5                  # round cap (max) this session — odd, >=3, default 5; fixed for the session
 ACTOR: codex               # next agent to act (matches STATUS)
 A: claude                  # whoever proposed in R1 — fixed for the session
 B: codex                   # the peer — fixed for the session
@@ -41,7 +41,7 @@ EFFORT:                    # optional peer reasoning effort (high|xhigh); empty 
 **Key conventions:**
 
 - **`ROUND` points to the next round to execute** (not the one just completed). After completing round N, set `ROUND: N+1` on handoff. The final round's actor (always A) leaves `ROUND: <ROUNDS>` and sets `STATUS: AWAITING_USER`. `consult_handoff` greps this value to name the next peer's log file (`round-${ROUND}-${peer}.log`).
-- **`ROUNDS` is fixed for the session** and set at init from `--number n` (default 5; forced odd and `>=3` so A always proposes *and* synthesizes — see SKILL.md). `consult_handoff` reads it to know which round is final; absent → treated as 5.
+- **`ROUNDS` is fixed for the session** and set at init from `--number n` — a round cap/depth normalized to odd and `>=3` so A always proposes *and* synthesizes (early termination may end before it; see SKILL.md). `consult_handoff` reads it to know which round is final; absent → treated as 5.
 - **`A` and `B` are fixed for the session.** Whoever proposed in R1 is A; the peer is B. Do not swap mid-session.
 - **`EFFORT` is fixed for the session** and set at init from `--model high|xhigh`. `consult_handoff` injects it into every peer invocation (`codex exec -c model_reasoning_effort=…` / `claude --effort …`); empty means no flag is added and each CLI uses its own default.
 - `STATUS: WAITING: <peer>` is what `consult_handoff` looks for to know who to invoke.
