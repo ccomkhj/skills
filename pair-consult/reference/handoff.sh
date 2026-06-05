@@ -72,13 +72,25 @@ consult_handoff() {
     return 2
   fi
 
-  if (( round < 1 || round > 5 )); then
-    echo "consult_handoff: ROUND=$round out of range; the loop has only 5 rounds." >&2
+  # Total rounds for this session. Defaults to 5 for back-compat with any
+  # STATE.md written before the ROUNDS: field existed. Forced odd at init so
+  # the final round always lands on A (the synthesizer); see SKILL.md.
+  local rounds
+  rounds=$(awk '/^ROUNDS:/ {print $2; exit}' .consult/STATE.md)
+  rounds=${rounds:-5}
+
+  # Reasoning effort for the peer (optional). When empty we inject no flag and
+  # each CLI uses its own default. Written once at init from --model.
+  local effort
+  effort=$(awk '/^EFFORT:/ {print $2; exit}' .consult/STATE.md)
+
+  if (( round < 1 || round > rounds )); then
+    echo "consult_handoff: ROUND=$round out of range; the loop has only $rounds rounds." >&2
     return 2
   fi
 
-  if (( round == 5 )); then
-    echo "consult_handoff: R5 is the final round — do NOT invoke the peer." >&2
+  if (( round == rounds )); then
+    echo "consult_handoff: R$rounds is the final round — do NOT invoke the peer." >&2
     echo "                  Set STATUS: AWAITING_USER in STATE.md and surface to the user." >&2
     return 4
   fi
@@ -98,10 +110,20 @@ consult_handoff() {
     buf=(stdbuf -oL -eL)
   fi
 
+  # Per-CLI effort flag, only added when EFFORT: is set. codex takes it as a
+  # config override (-c model_reasoning_effort=...); claude has a first-class
+  # --effort. Both accept high|xhigh verbatim. Empty array = true no-op.
+  local codex_effort=() claude_effort=()
+  if [[ -n "$effort" ]]; then
+    codex_effort=(-c "model_reasoning_effort=$effort")
+    claude_effort=(--effort "$effort")
+  fi
+
   case "$peer" in
     codex)
       ( nohup "${buf[@]}" codex exec \
           -s workspace-write \
+          "${codex_effort[@]}" \
           -C "$(pwd)" \
           --skip-git-repo-check \
           "$prompt" 2>&1 \
@@ -109,9 +131,10 @@ consult_handoff() {
       ;;
     claude)
       # flags before prompt; `--` terminates the variadic --add-dir so the
-      # prompt isn't parsed as another directory.
+      # prompt isn't parsed as another directory. --effort must stay before --.
       ( nohup "${buf[@]}" claude -p \
           --dangerously-skip-permissions \
+          "${claude_effort[@]}" \
           --add-dir "$(pwd)" \
           -- \
           "$prompt" 2>&1 \
@@ -355,8 +378,8 @@ consult_takeover() {
 # user in the loop without forcing them to cat the file.
 consult_digest() {
   local n="$1"
-  if [[ -z "$n" || ! "$n" =~ ^[1-5]$ ]]; then
-    echo "consult_digest: usage: consult_digest <1|2|3|4|5>" >&2
+  if [[ -z "$n" || ! "$n" =~ ^[1-9][0-9]*$ ]]; then
+    echo "consult_digest: usage: consult_digest <round-number>" >&2
     return 2
   fi
   local f=".consult/R${n}.md"

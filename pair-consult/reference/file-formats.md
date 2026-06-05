@@ -1,6 +1,6 @@
 # pair-consult — file formats reference
 
-Templates for files under `.consult/`. The five round files (`R1.md`–`R5.md`) follow strict shapes; `STATE.md` is parsed by `consult_handoff` (greps for `ROUND:` and `STATUS:`).
+Templates for files under `.consult/`. The round files (`R1.md`–`Rn.md`, default `n=5`) follow strict shapes; `STATE.md` is parsed by `consult_handoff` (greps for `ROUND:`, `ROUNDS:`, `EFFORT:`, and `STATUS:`).
 
 ## `.consult/QUESTION.md`
 
@@ -25,9 +25,11 @@ Updated by the actor at the end of every round.
 
 STATUS: WAITING: codex     # WAITING: claude | WAITING: codex | AWAITING_USER | BLOCKED: <reason>
 ROUND: 2
+ROUNDS: 5                  # total rounds this session — odd, >=3, default 5; fixed for the session
 ACTOR: codex               # next agent to act (matches STATUS)
 A: claude                  # whoever proposed in R1 — fixed for the session
 B: codex                   # the peer — fixed for the session
+EFFORT:                    # optional peer reasoning effort (high|xhigh); empty = each CLI's default
 
 ## Round log
 | Round | Actor  | Output | Notes                                 |
@@ -38,9 +40,23 @@ B: codex                   # the peer — fixed for the session
 
 **Key conventions:**
 
-- **`ROUND` points to the next round to execute** (not the one just completed). After completing round N, set `ROUND: N+1` on handoff. R5's actor leaves `ROUND: 5` and sets `STATUS: AWAITING_USER`. `consult_handoff` greps this value to name the next peer's log file (`round-${ROUND}-${peer}.log`).
+- **`ROUND` points to the next round to execute** (not the one just completed). After completing round N, set `ROUND: N+1` on handoff. The final round's actor (always A) leaves `ROUND: <ROUNDS>` and sets `STATUS: AWAITING_USER`. `consult_handoff` greps this value to name the next peer's log file (`round-${ROUND}-${peer}.log`).
+- **`ROUNDS` is fixed for the session** and set at init from `--number n` (default 5; forced odd and `>=3` so A always proposes *and* synthesizes — see SKILL.md). `consult_handoff` reads it to know which round is final; absent → treated as 5.
 - **`A` and `B` are fixed for the session.** Whoever proposed in R1 is A; the peer is B. Do not swap mid-session.
+- **`EFFORT` is fixed for the session** and set at init from `--model high|xhigh`. `consult_handoff` injects it into every peer invocation (`codex exec -c model_reasoning_effort=…` / `claude --effort …`); empty means no flag is added and each CLI uses its own default.
 - `STATUS: WAITING: <peer>` is what `consult_handoff` looks for to know who to invoke.
+
+### Templates are role-typed, not round-number-typed
+
+The five templates below are keyed to a **role**, not a fixed round number. They map 1:1 onto rounds only at the default `n=5`. For any odd `n>=3`, reuse them by role (see SKILL.md's round-protocol for the full rule):
+
+- Round 1 → **propose** (`R1.md` template), always A.
+- The final round (`n`) → **synthesize** (`R5.md` template), always A.
+- The B round just before synthesis (round `n-1`) → **re-review / accept-double-down** (`R4.md` template).
+- Other even rounds → B **review** with fresh numbered critiques (`R2.md` template).
+- Other odd interior rounds → A **respond** per critique (`R3.md` template).
+
+For larger odd `n` the review/respond templates simply repeat; each round still writes `R<round>.md`.
 
 ## `.consult/R1.md` — A proposes
 
