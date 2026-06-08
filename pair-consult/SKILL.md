@@ -1,6 +1,7 @@
 ---
 name: pair-consult
 description: Bounded multi-round consultation (default 5 rounds, set with --number) between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when /pair-coding's spec→plan→code ceremony is too heavy and the user wants a tighter back-and-forth ending in user confirmation.
+argument-hint: "<question> [--number n] [--model high|xhigh]"
 ---
 
 # pair-consult
