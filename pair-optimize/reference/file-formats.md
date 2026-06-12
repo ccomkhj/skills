@@ -35,10 +35,9 @@ Updated by the actor at the end of every round.
 ```markdown
 # Optimize Session: <short slug>
 
-STATUS: WAITING: codex     # WAITING: claude | WAITING: codex | AWAITING_USER | BLOCKED: <reason>
+STATUS: WAITING: codex     # ACTIVE: <name> (init/R1 only) | WAITING: claude | WAITING: codex | AWAITING_USER | BLOCKED: <reason>
 ROUND: 2
 ROUNDS: 5                  # round cap (max) this session — odd, >=3, default 5; fixed for the session
-ACTOR: codex               # next agent to act (matches STATUS)
 A: claude                  # whoever measured the baseline in R1 — fixed for the session
 B: codex                   # the peer — fixed for the session
 EFFORT:                    # optional peer reasoning effort (high|xhigh); empty = each CLI's default
@@ -52,6 +51,7 @@ EFFORT:                    # optional peer reasoning effort (high|xhigh); empty 
 
 **Key conventions:**
 
+- **`STATUS` values name the CLI, never the role letter** — `WAITING: claude` / `WAITING: codex`, not `WAITING: A`. `ACTIVE: <name>` is legal only at init while A does R1; the inline `# ...` comments above are documentation (the helpers strip them when parsing, but you may omit them).
 - **`ROUND` points to the next round to execute.** After completing round N, set `ROUND: N+1` on handoff. The final round's actor (always A) leaves `ROUND: <ROUNDS>` and sets `STATUS: AWAITING_USER`.
 - **`ROUNDS` is the round cap**, normalized odd and `>=3` at init from `--number n` (default 5; early termination may end sooner). `optimize_handoff` reads it to know which round is final; absent → treated as 5.
 - **`EFFORT`** is set at init from `--model high|xhigh`; `optimize_handoff` injects it into every peer invocation. Empty = no flag.
@@ -59,7 +59,7 @@ EFFORT:                    # optional peer reasoning effort (high|xhigh); empty 
 
 ### Templates are role-typed, not round-number-typed
 
-Keyed to a role, mapping 1:1 onto rounds only at `n=5`. For larger odd `n`, reuse by role: round 1 = baseline (R1), final round = synthesize (R5), the B round just before synthesis = audit (R4), other even rounds = challenge (R2), other odd interior rounds = implement+benchmark (R3). Each round still writes `R<round>.md`.
+Keyed to a round type, mapping 1:1 onto round numbers only at `n=5`. Determine a round's type from the **round-type table in SKILL.md's Overview** (the canonical statement of the round math), then use the template named for that type. Each round still writes `R<round>.md`.
 
 ## `.optimize/R1.md` — A measures the baseline and proposes
 

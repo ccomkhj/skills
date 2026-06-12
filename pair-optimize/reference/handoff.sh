@@ -52,8 +52,10 @@ optimize_handoff() {
   # Guard against firing with a stale STATE: STATE.md must say WAITING: <peer>
   # before we invoke. Catches the bug where the agent forgets to flip STATE
   # after writing their round.
+  # The trailing sub() strips inline '# ...' comments and whitespace, so a
+  # STATE.md copied verbatim from the file-formats template still parses.
   local state_status
-  state_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); print; exit}' .optimize/STATE.md)
+  state_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .optimize/STATE.md)
   if [[ "$state_status" != "WAITING: $peer" ]]; then
     echo "optimize_handoff: STATE.md says STATUS='$state_status' but you're handing off to '$peer'." >&2
     echo "                 Update STATE.md first: 'STATUS: WAITING: $peer', then retry." >&2
@@ -195,10 +197,11 @@ optimize_wait() {
 
   # Use awk to both detect and extract — keeps the function portable across
   # bash and zsh (zsh has no BASH_REMATCH, and `status` is a read-only
-  # special variable, so we use `cur_status` below).
+  # special variable, so we use `cur_status` below). Trailing sub() strips
+  # inline '# ...' comments so template-faithful STATE.md files parse.
   local initial peer
-  initial=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); print; exit}' .optimize/STATE.md)
-  peer=$(awk '/^STATUS:[[:space:]]*WAITING:/ {sub(/^STATUS:[[:space:]]*WAITING:[[:space:]]*/,""); print; exit}' .optimize/STATE.md)
+  initial=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .optimize/STATE.md)
+  peer=$(awk '/^STATUS:[[:space:]]*WAITING:/ {sub(/^STATUS:[[:space:]]*WAITING:[[:space:]]*/,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .optimize/STATE.md)
   if [[ -z "$peer" ]]; then
     echo "optimize_wait: STATUS is '$initial' (not 'WAITING: <peer>'). Nothing to wait for — act now."
     return 0
@@ -219,7 +222,7 @@ optimize_wait() {
     # the variable each iteration (zsh's `local` is `typeset`, which echoes
     # parameter state in some forms).
     local cur_status=""
-    cur_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); print; exit}' .optimize/STATE.md 2>/dev/null)
+    cur_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .optimize/STATE.md 2>/dev/null)
     if [[ "$cur_status" != "WAITING: $peer" ]]; then
       echo "optimize_wait: STATUS is now '$cur_status' after ${elapsed}s — your turn."
       return 0
@@ -267,7 +270,7 @@ optimize_watch() {
   touch .optimize/session.log
   echo "optimize_watch: tailing .optimize/session.log (Ctrl-C to exit)"
   echo "optimize_watch: current state:"
-  grep -E '^(STATUS|ROUND|ACTOR|A|B):' .optimize/STATE.md 2>/dev/null | sed 's/^/  /'
+  grep -E '^(STATUS|ROUND|ROUNDS|A|B):' .optimize/STATE.md 2>/dev/null | sed 's/^/  /'
   echo "--- live feed ---"
   tail -F .optimize/session.log
 }
@@ -278,7 +281,7 @@ optimize_status() {
     return 2
   fi
   echo "=== state ==="
-  grep -E '^(STATUS|ROUND|ACTOR|A|B):' .optimize/STATE.md | sed 's/^/  /'
+  grep -E '^(STATUS|ROUND|ROUNDS|A|B):' .optimize/STATE.md | sed 's/^/  /'
   echo
   echo "=== user notes (mid-flight) ==="
   local notes=""

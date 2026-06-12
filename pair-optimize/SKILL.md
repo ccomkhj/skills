@@ -1,6 +1,7 @@
 ---
 name: pair-optimize
-description: Bounded multi-round (default 5, set with --number) Claude ↔ Codex optimization loop for a DuckDB/SQL query or a hot Python path — A measures a baseline and proposes ranked candidates, B challenges them, A implements and benchmarks, B audits the measurement, A synthesizes and asks the user. Hard rule — no optimization is kept unless it is measured faster/cheaper AND produces identical output to the baseline. Use when the user wants a measured, second-opinion speedup/cost-reduction rather than vibes-based tuning.
+description: Use when the user wants a measured speedup or cost reduction for something concrete and runnable — a DuckDB/SQL query, a hot Python path, an endpoint, a pipeline step — with a second agent (Claude ↔ Codex) challenging the numbers, rather than vibes-based tuning. Also use when invoked as the peer ("Resume the pair-optimize skill"). Hard rule — no optimization is kept unless it is measured faster/cheaper AND produces output identical to the baseline.
+argument-hint: "<target> [--from-session] [--number n] [--model high|xhigh]"
 ---
 
 # pair-optimize
@@ -19,9 +20,9 @@ A candidate that can't be measured is **not** "probably fine" — it is labeled 
 You were invoked via `codex exec` or `claude -p` with *"Resume the pair-optimize skill. Read .optimize/STATE.md..."*. You are a **one-shot peer**: you do exactly ONE round (an even round — R2, R4, …) and exit. Do this:
 
 1. `cat .optimize/STATE.md .optimize/TARGET.md .optimize/USER_NOTES.md` — orient.
-2. Confirm `STATUS: WAITING: <you>` and read `ROUND:` + `ROUNDS:`. You are B; your even round is a **challenge** of A's latest work by default (R2-style), or an **audit of the measurement** (R4-style) **only when `ROUNDS >= 5` and `ROUND == ROUNDS-1`**. At `n=3` the single B round is a challenge.
+2. Confirm `STATUS: WAITING: <you>` and read `ROUND:` + `ROUNDS:`. You are B; even rounds are yours — find whether this one is a **challenge** or a **measurement audit** in the [round-type table](#overview).
 3. **Re-run the numbers yourself** where you can — don't trust A's benchmark on faith; that's the entire point of a second agent.
-4. Write `R<ROUND>.md`, then update `STATE.md`: set `STATUS: WAITING: <orchestrator>` and bump `ROUND`.
+4. Write `R<ROUND>.md`, then update `STATE.md`: set `STATUS: WAITING: <A's CLI name>` (the value of STATE.md's `A:` line, e.g. `WAITING: claude` — never the literal letter "A") and bump `ROUND`.
 5. **EXIT. Do NOT call `optimize_handoff` or `optimize_wait`.** The orchestrator is already blocked in `optimize_wait` and resumes the instant you flip `STATE.md`. If you hand off, you spawn a **duplicate orchestrator** — two instances collide on `STATE.md`. Don't be that bug.
 
 **You never do the final round.** The final round (`ROUND == ROUNDS`) is always the orchestrator's synthesis. Only the orchestrator runs `optimize_handoff` + `optimize_wait`; see [Two roles](#two-roles) and [Handoff](#handoff).
@@ -40,7 +41,17 @@ The default session is **5 rounds**. `--number n` sets the **round cap** (`ROUND
 | **R4** | B (peer, one-shot) | **Audit the measurement.** Warm-cache artifact? representative data? enough iterations? correctness actually held? win worth the complexity? Per candidate: `Verdict: keep\|revert\|doubt`. | `R4.md` |
 | **R5** | A (orchestrator) | **Synthesize + ask user.** Net result with numbers, correctness statement, complexity tradeoffs, what to keep. | `R5.md` — user reads this |
 
-**General rule for any odd `n` (`ROUNDS`):** round 1 = A measures+proposes; the final round `n` = A synthesizes (`AWAITING_USER`); interior rounds alternate — **even rounds = B challenges/audits, odd rounds = A implements+benchmarks.** `n` is forced odd so A is both the first measurer and the last synthesizer. At `n=3` it's baseline · challenge · synthesize (one B round, a challenge — no separate audit); at `n=5` it's the table above; at `n=7` it adds another implement/challenge cycle.
+**Round-type rule — canonical; every other mention of the round math points here.** Given `ROUND` and `ROUNDS` (= `n`, forced odd so A is both the first measurer and the last synthesizer), first matching row wins:
+
+| Condition | Actor | Round type |
+|---|---|---|
+| `ROUND == 1` | A | Baseline + candidates |
+| `ROUND == ROUNDS` | A | Synthesize + ask user |
+| `ROUND == ROUNDS-1` and `ROUNDS >= 5` | B | Audit the measurement |
+| other even `ROUND` | B | Challenge |
+| other odd `ROUND` | A | Implement + benchmark |
+
+At `n=5` this is exactly the table above; at `n=7` it adds another implement/challenge cycle. **At `n=3`** there is no audit and no interior implement round — the single B round is a challenge, and A may fold implement+benchmark into the final synthesis round (the contract still holds: only measured wins are kept) but must note in the synthesis that those numbers received no B audit.
 
 After the final round, `STATUS: AWAITING_USER` and the loop stops. The user's reply (apply / iterate / cancel) closes the session.
 
@@ -49,7 +60,7 @@ After the final round, `STATUS: AWAITING_USER` and the loop stops. The user's re
 The loop has an **asymmetry that prevents duplicate instances** — internalize it.
 
 - **Orchestrator = A** = the interactive session that ran `/pair-optimize`. Alive for the whole session; does the odd rounds (R1, R3, … and the final round). After each non-final round it spawns the peer (`optimize_handoff B`) and blocks in `optimize_wait` until the peer flips `STATE.md` back. After the final round it stops.
-- **Peer = B** = a *fresh, headless, one-shot* instance, cold-woken by `optimize_handoff`. It does exactly one round (an even round), flips `STATUS: WAITING: A`, and **exits**. It never calls `optimize_handoff` and never calls `optimize_wait`.
+- **Peer = B** = a *fresh, headless, one-shot* instance, cold-woken by `optimize_handoff`. It does exactly one round (an even round), flips `STATUS: WAITING: <A's CLI name>`, and **exits**. It never calls `optimize_handoff` and never calls `optimize_wait`.
 
 **Why:** `optimize_handoff` always *spawns a new instance* of the named peer. If B hands back with `optimize_handoff A`, it spawns a **second A** while the original is still alive in `optimize_wait` — both act, both write the round, both collide on `STATE.md`. Safe shape: **only the orchestrator hands off and waits; the peer flips-and-exits.**
 
@@ -64,13 +75,13 @@ The loop has an **asymmetry that prevents duplicate instances** — internalize 
 
 ## Round protocol — one allowed action per round
 
-Each round is narrow on purpose. **Templates for each round file are in [reference/file-formats.md](reference/file-formats.md).** Figure out your role from `ROUND` + `ROUNDS` (see the [Overview](#overview) rule).
+Each round is narrow on purpose. **Templates for each round file are in [reference/file-formats.md](reference/file-formats.md).** Figure out which round type you're doing from the round-type table in the [Overview](#overview) — the labels below name the type, not a round number.
 
-- **Baseline + candidates (round 1, A).** Read `TARGET.md`. Build/identify a measurement harness and record the **baseline number** (SQL: wall-time + rows/bytes scanned via `EXPLAIN ANALYZE`; Python: median over N runs via `timeit`/`pytest-benchmark`, plus a `cProfile` hotspot). Identify the **real bottleneck with evidence** — not a guess. Propose ranked candidates (C1, C2, …), each with the mechanism of the expected win and any correctness risk. Do **not** change code yet.
-- **Challenge (even rounds, B).** Reproduce A's baseline where you can. Attack: is the data representative? the metric the right one? the bottleneck actually dominant? Is each candidate premature/cargo-cult, and will it move the *measured* metric? Flag correctness risks. For each, name the measurement that proves or kills it. Numbered challenges. Then flip `STATUS: WAITING: A`, bump `ROUND`, **exit**.
-- **Implement + benchmark (odd interior rounds, A).** Apply the surviving candidate(s) in the repo. Benchmark each against the baseline on the **same harness and data**, enough iterations to beat noise. **Prove output equality** (SQL: `EXCEPT` both directions / `ORDER BY`+hash / row-count+checksum; Python: identical return or existing tests pass). Per candidate write `Result: kept|reverted`, baseline→after numbers, and the correctness check. A candidate that isn't measurably better, or changes output, is **reverted**.
-- **Audit the measurement (round `n-1`, last B round — only when `n >= 5`).** Never at `n=3`. For each kept candidate, attack the *measurement*, not just the idea: warm-cache/JIT artifact, unrepresentative data, too few iterations vs variance, correctness check too weak. Decide `keep` / `revert` / `doubt` (needs re-measure). Is the win worth the added complexity? This is B's last word. Flip `STATUS: WAITING: A`, set `ROUND: <n>`, **exit**.
-- **Synthesize + ask (round `n`, A).** Net result: which candidates to keep with their numbers and the combined effect, the correctness statement, the complexity/maintainability cost, and anything still `UNVERIFIED`. Then `STATUS: AWAITING_USER` and stop.
+- **Baseline + candidates (A).** Read `TARGET.md`. Build/identify a measurement harness and record the **baseline number** (SQL: wall-time + rows/bytes scanned via `EXPLAIN ANALYZE`; Python: median over N runs via `timeit`/`pytest-benchmark`, plus a `cProfile` hotspot). Identify the **real bottleneck with evidence** — not a guess. Propose ranked candidates (C1, C2, …), each with the mechanism of the expected win and any correctness risk. Do **not** change code yet.
+- **Challenge (B).** Reproduce A's baseline where you can. Attack: is the data representative? the metric the right one? the bottleneck actually dominant? Is each candidate premature/cargo-cult, and will it move the *measured* metric? Flag correctness risks. For each, name the measurement that proves or kills it. Numbered challenges. Then flip `STATUS: WAITING: <A's CLI name>`, bump `ROUND`, **exit**.
+- **Implement + benchmark (A).** Apply the surviving candidate(s) in the repo. Benchmark each against the baseline on the **same harness and data**, enough iterations to beat noise. **Prove output equality** (SQL: `EXCEPT` both directions / `ORDER BY`+hash / row-count+checksum; Python: identical return or existing tests pass). Per candidate write `Result: kept|reverted`, baseline→after numbers, and the correctness check. A candidate that isn't measurably better, or changes output, is **reverted**.
+- **Audit the measurement (B).** For each kept candidate, attack the *measurement*, not just the idea: warm-cache/JIT artifact, unrepresentative data, too few iterations vs variance, correctness check too weak. Decide `keep` / `revert` / `doubt` (needs re-measure). Is the win worth the added complexity? This is B's last word. Flip `STATUS: WAITING: <A's CLI name>`, set `ROUND: <n>`, **exit**.
+- **Synthesize + ask (A).** Net result: which candidates to keep with their numbers and the combined effect, the correctness statement, the complexity/maintainability cost, and anything still `UNVERIFIED`. Then `STATUS: AWAITING_USER` and stop.
 
 ### Early termination
 
@@ -157,13 +168,14 @@ Bash(command="source ~/.claude/skills/pair-optimize/reference/handoff.sh && opti
 
 ## Hazards
 
-All guarded by `optimize_handoff` — listed so you don't reinvent them.
+The CLI hazards are pre-solved by `optimize_handoff` — listed so you don't reinvent them. The last two are process rules the contract enforces, not script guards.
 
 | Hazard | Rule |
 |---|---|
 | `claude -p "<prompt>" <flags>` — flags after prompt hang the CLI | Flags first; use `optimize_handoff`. |
 | `claude --add-dir <dir> "<prompt>"` — variadic flag eats prompt | `--` terminator before the prompt. |
 | `killall claude` / `pkill codex` to recover | Kills the user's main session. Use `optimize_peer_status <peer>`. |
+| `claude -p --bare` — fails auth unless `ANTHROPIC_API_KEY` is set | Don't use `--bare`. |
 | Benchmarking with a warm cache / one iteration | Fake wins. State cache state; run enough reps; report spread. |
 | Keeping a candidate without an output-equality check | Correctness regression masquerading as a speedup. The contract forbids it. |
 
@@ -186,7 +198,8 @@ All guarded by `optimize_handoff` — listed so you don't reinvent them.
 | Optimizing something that isn't the bottleneck | Profile in R1; B challenges the bottleneck claim in R2. |
 | Claiming a speedup with no number / one noisy run | Report median + spread over N reps; B audits this in R4. |
 | Keeping a faster-but-wrong version | Output-equality is half the contract. Wrong = reverted. |
-| Peer (B) calling `optimize_handoff`/`optimize_wait` after a B round | Spawns a duplicate orchestrator that races the live one. The peer is one-shot: flip `STATUS: WAITING: A` and **exit**. |
+| Peer (B) calling `optimize_handoff`/`optimize_wait` after a B round | Spawns a duplicate orchestrator that races the live one. The peer is one-shot: flip `STATUS: WAITING: <A's CLI name>` and **exit**. |
+| Writing `STATUS: WAITING: A` (the role letter) | STATUS names the CLI: `WAITING: claude` / `WAITING: codex` — `optimize_handoff` matches on the name. Read it off STATE.md's `A:` line. |
 | Invoking peer at the final round | The final round (`ROUND == ROUNDS`) ends the loop. Surface to the user. |
 | Running pair-optimize alongside `.consult/` or `.pair/` in one repo | One pair session per repo. If another exists, abort `STATUS: BLOCKED: collision`. |
 | Idling after `optimize_handoff` ("harness will notify me") | It won't — the peer is `nohup`'d. Always follow with `optimize_wait` (background in Claude Code). |

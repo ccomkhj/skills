@@ -1,0 +1,18 @@
+{
+  "skill_name": "pair-optimize",
+  "notes": "Deterministic checks for reference/handoff.sh (template parsing, status guards, final-round refusal) live in handoff-parsing.sh — run `bash evals/handoff-parsing.sh`; exit 0 = pass. The evals below are agent-behavior scenarios.",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Resume the pair-optimize skill. Read .optimize/STATE.md and continue from STATUS: WAITING: codex.\n\n(Context for the eval harness: .optimize/ exists with STATE.md saying ROUND: 2, ROUNDS: 5, STATUS: WAITING: codex, A: claude, B: codex; TARGET.md describes a DuckDB query with a measurement harness in .optimize/bench/; R1.md contains claude's measured baseline, a profiled bottleneck claim, and three ranked candidates C1-C3.)",
+      "expected_output": "Acts as a one-shot peer doing exactly one challenge round. Reads STATE.md/TARGET.md/R1.md, determines from the round-type table that R2 is a challenge (not an audit), re-runs the baseline where possible, writes R2.md with numbered challenges tied to C1-C3 each naming the measurement that settles it, then updates STATE.md to STATUS: WAITING: claude (the CLI name from the A: line — never the literal 'WAITING: A') and ROUND: 3, and exits. Must NOT call optimize_handoff or optimize_wait, must not implement any candidate, and must not do more than this one round.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "/pair-optimize \"the aggregate_daily_sales() function in etl/report.py — pandas groupby over a 5M-row parquet, takes ~40s per pipeline run\" --number 3",
+      "expected_output": "Initializes .optimize/ with ROUNDS: 3 (already odd, no normalization message needed), writes TARGET.md with a named primary metric, harness, representative data, and a correctness oracle. R1: measures the baseline (median + spread over N reps), profiles to evidence the bottleneck, proposes ranked candidates without changing code, then hands off to the peer and waits. After the peer's R2 challenge, the final round is A's: at n=3 there is no audit round, so A may fold implement+benchmark into the synthesis — keeping only candidates that are measured faster AND output-identical, explicitly noting in the synthesis that those numbers received no B audit — and ends with STATUS: AWAITING_USER and an R3.md the user can read like a PR description. No candidate may be kept on estimated or fabricated numbers.",
+      "files": []
+    }
+  ]
+}
