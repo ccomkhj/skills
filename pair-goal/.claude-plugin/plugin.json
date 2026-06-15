@@ -1,0 +1,19 @@
+{
+  "name": "pair-goal",
+  "description": "Goal-driven improvement loop: understand what needs improving, forge a /goal completion condition, then race a different-model Claude against Codex (each in its own git worktree) round by round until the goal is met, summarize, and ship a PR.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Huijo Kim",
+    "email": "huijo.kim@voids.ai"
+  },
+  "license": "MIT",
+  "keywords": [
+    "goal",
+    "iteration",
+    "codex",
+    "pair",
+    "worktree",
+    "orchestration",
+    "improvement"
+  ]
+}
