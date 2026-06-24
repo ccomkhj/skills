@@ -77,10 +77,10 @@ The loop has an **asymmetry that prevents duplicate instances** — internalize 
 
 Each round is narrow on purpose. **Templates for each round file are in [reference/file-formats.md](reference/file-formats.md).** Figure out which round type you're doing from the round-type table in the [Overview](#overview) — the labels below name the type, not a round number.
 
-- **Baseline + candidates (A).** Read `TARGET.md`. Build/identify a measurement harness and record the **baseline number** (SQL: wall-time + rows/bytes scanned via `EXPLAIN ANALYZE`; Python: median over N runs via `timeit`/`pytest-benchmark`, plus a `cProfile` hotspot). Identify the **real bottleneck with evidence** — not a guess. Propose ranked candidates (C1, C2, …), each with the mechanism of the expected win and any correctness risk. Do **not** change code yet.
-- **Challenge (B).** Reproduce A's baseline where you can. Attack: is the data representative? the metric the right one? the bottleneck actually dominant? Is each candidate premature/cargo-cult, and will it move the *measured* metric? Flag correctness risks. For each, name the measurement that proves or kills it. Numbered challenges. Then flip `STATUS: WAITING: <A's CLI name>`, bump `ROUND`, **exit**.
-- **Implement + benchmark (A).** Apply the surviving candidate(s) in the repo. Benchmark each against the baseline on the **same harness and data**, enough iterations to beat noise. **Prove output equality** (SQL: `EXCEPT` both directions / `ORDER BY`+hash / row-count+checksum; Python: identical return or existing tests pass). Per candidate write `Result: kept|reverted`, baseline→after numbers, and the correctness check. A candidate that isn't measurably better, or changes output, is **reverted**.
-- **Audit the measurement (B).** For each kept candidate, attack the *measurement*, not just the idea: warm-cache/JIT artifact, unrepresentative data, too few iterations vs variance, correctness check too weak. Decide `keep` / `revert` / `doubt` (needs re-measure). Is the win worth the added complexity? This is B's last word. Flip `STATUS: WAITING: <A's CLI name>`, set `ROUND: <n>`, **exit**.
+- **Baseline + candidates (A).** Read `TARGET.md`. Build/identify a measurement harness and record the **baseline number** (SQL: wall-time + rows/bytes scanned via `EXPLAIN ANALYZE`; Python: median over N runs via `timeit`/`pytest-benchmark`, plus a **sampling** profile for the real hotspot — see [Measurement & equivalence techniques](#measurement--equivalence-techniques-hard-won)). Identify the **real bottleneck with evidence** — not a guess. Propose ranked candidates (C1, C2, …), each with the mechanism of the expected win and any correctness risk. Do **not** change code yet.
+- **Challenge (B).** Reproduce A's baseline where you can. Attack: is the data representative? the metric the right one? the bottleneck actually dominant (or a contention artifact — see [techniques](#measurement--equivalence-techniques-hard-won))? Is each candidate premature/cargo-cult, and will it move the *measured* metric? **Hunt for the input distribution or invariant where the candidate's output diverges** — identical on sample data is NOT behaviour-preservation (duplicate/overlapping keys, NULLs, empty input, dtype shifts, ordering). For each, name the measurement that proves or kills it. Numbered challenges. Then flip `STATUS: WAITING: <A's CLI name>`, bump `ROUND`, **exit**.
+- **Implement + benchmark (A).** Apply the surviving candidate(s) in the repo. Benchmark each against the baseline on the **same harness and data**, enough iterations to beat noise. **Prove output equality** (SQL: `EXCEPT` both directions / `ORDER BY`+hash / row-count+checksum; Python: identical return or existing tests pass) and **commit that equality check to `bench/`** as a re-runnable script, so B can independently re-execute it in R4. Per candidate write `Result: kept|reverted`, baseline→after numbers, and the correctness check. A candidate that isn't measurably better, or changes output, is **reverted**.
+- **Audit the measurement (B).** For each kept candidate, attack the *measurement*, not just the idea: warm-cache/JIT artifact, contention/shared-infra variance, unrepresentative data, too few iterations vs variance. **And re-verify equality yourself, don't just critique A's proof** — the whole point of a second agent applies to *both* halves of the contract, not only the speed number. Re-run A's equivalence check from `bench/` against the candidate, and add at least one adversarial input of your own (dup/overlapping key, NULL, empty, dtype shift, reordered) comparing baseline-impl vs candidate-impl directly. If the harness can't be re-run headless, say so and downgrade to `doubt`. Decide `keep` / `revert` / `doubt` (needs re-measure). Is the win worth the added complexity? This is B's last word. Flip `STATUS: WAITING: <A's CLI name>`, set `ROUND: <n>`, **exit**.
 - **Synthesize + ask (A).** Net result: which candidates to keep with their numbers and the combined effect, the correctness statement, the complexity/maintainability cost, and anything still `UNVERIFIED`. Then `STATUS: AWAITING_USER` and stop.
 
 ### Early termination
@@ -95,6 +95,18 @@ Each round is narrow on purpose. **Templates for each round file are in [referen
 | A kept a candidate with new/contested numbers | Run the next B-audit — it catches measurement artifacts. |
 
 When skipping ahead, jump straight to the final round (`ROUND: <n>`, A synthesizes, `AWAITING_USER`) — early exit never lands the terminal step on B. Note any skip in the synthesis.
+
+## Measurement & equivalence techniques (hard-won)
+
+These are the traps that turn a "win" into wasted effort or a production bug. Apply them in R1/R3 (A) and enforce them in R2/R4 (B).
+
+**Profile with a SAMPLING profiler, not `cProfile`, to pick the target.** `cProfile` adds fixed per-call instrumentation, so a function called 10^8× looks dominant even when its body is cheap — "optimize" it and the wall-clock won't move. Use `pyinstrument` (in-process, no sudo) or `py-spy` for true wall-clock attribution; cross-check before believing a hotspot. For a hot leaf, the lever is reducing **call count**, not shaving the body. (Real case: a per-cell helper showed 53s in cProfile; tuning its body was wall-clock-neutral — the real cost was its call count, and the actual wins were elsewhere.)
+
+**Trust back-to-back old-vs-new ratios, not absolute timings.** Shared infra (RDS, CI runners) varies run-to-run under load — the same query measured 124s once and 9s in isolation. Before "fixing" a suspected elephant, re-measure it in isolation; the slowness may be contention, and the fix may be neutral (don't ship it). Always report the candidate's number measured immediately against the baseline on the same input.
+
+**Isolate the candidate when the target is a sub-step of a larger or non-deterministic pipeline.** Don't diff the whole pipeline output — unrelated upstream nondeterminism will swamp the signal. Instead: hook the target function, capture its real input (deep-copy it), then run the **baseline impl vs the candidate impl on that exact same input, in-process**, and compare outputs directly. This isolates the change from upstream noise AND yields a clean old-vs-new timing. For a SQL rewrite, run both query shapes against the **live pipeline engine** (a fresh connection may lack the schema `search_path`).
+
+**Match the equivalence bar to the operation.** Deterministic compute → exact (`assert_frame_equal(check_exact=True, check_dtype=True)`; identical return). SQL aggregates → `SUM`/`AVG` have no guaranteed order, so accept floating-point tolerance (~1e-12), not bit-identity, and say so. Either way: **a clean diff on sample data is necessary but not sufficient** — also prove the candidate holds on the *invariant* the old code relied on (see B's challenge mandate). When in doubt, construct the adversarial input (duplicate key, NULL, empty) and compare old-vs-new on it directly.
 
 ## Surfacing rounds in chat
 
@@ -118,7 +130,7 @@ Create `.optimize/` at the repo root on init and append `.optimize/` to `.gitign
 | `TARGET.md` | What to optimize + the measurement setup (data, harness, metric) + constraints | Active agent on init |
 | `STATE.md` | `ROUND`, `ROUNDS`, `STATUS`, `A`, `B`, `EFFORT`, round log | Every round |
 | `R1.md` … `R<ROUNDS>.md` | Round content (numbers live here; code lives in the repo) | Actor of that round |
-| `bench/` | Benchmark scripts + raw timing output, so both agents run the *same* harness | Whoever builds the harness (R1) |
+| `bench/` | Benchmark scripts + raw timing output **and the equivalence-check harness**, so both agents run the *same* harness — A commits the equality check here (not just timing) so B can re-run it headless in R4 | Whoever builds the harness (R1) |
 | `USER_NOTES.md` | User-injected steers (created lazily) | `optimize_inject` |
 | `session.log` + `round-<N>-<peer>.log` | Peer stdout | `optimize_handoff` |
 
@@ -196,7 +208,12 @@ The CLI hazards are pre-solved by `optimize_handoff` — listed so you don't rei
 |---|---|
 | Optimizing before measuring | R1 establishes the baseline first. No baseline = no contract. |
 | Optimizing something that isn't the bottleneck | Profile in R1; B challenges the bottleneck claim in R2. |
+| Trusting `cProfile` to pick the target | It over-weights call-heavy leaves; body tweaks come out neutral. Use a sampling profiler ([techniques](#measurement--equivalence-techniques-hard-won)). |
+| "Fixing" an elephant that was really contention | Re-measure in isolation first; same query was 124s under load, 9s isolated. |
+| Diffing a whole pipeline that's run-to-run non-deterministic | Isolate: capture the function's input, run old vs new on the SAME input. |
+| Treating "identical on sample data" as behaviour-preserving | It isn't. Prove the invariant holds too; construct the adversarial input (dup key, NULL, empty). A unique-key dev sample hid a JOIN double-count bug; EXISTS preserved the union semantics. |
 | Claiming a speedup with no number / one noisy run | Report median + spread over N reps; B audits this in R4. |
+| Keeping a neutral micro-opt "because it's cleaner" | The contract keeps only *measured* wins. Neutral = revert. |
 | Keeping a faster-but-wrong version | Output-equality is half the contract. Wrong = reverted. |
 | Peer (B) calling `optimize_handoff`/`optimize_wait` after a B round | Spawns a duplicate orchestrator that races the live one. The peer is one-shot: flip `STATUS: WAITING: <A's CLI name>` and **exit**. |
 | Writing `STATUS: WAITING: A` (the role letter) | STATUS names the CLI: `WAITING: claude` / `WAITING: codex` — `optimize_handoff` matches on the name. Read it off STATE.md's `A:` line. |

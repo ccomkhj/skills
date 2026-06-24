@@ -1,6 +1,6 @@
 ---
 name: pair-consult
-description: Bounded multi-round consultation (default 5 rounds, set with --number) between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when /pair-coding's spec→plan→code ceremony is too heavy and the user wants a tighter back-and-forth ending in user confirmation.
+description: Bounded multi-round consultation (default 5 rounds, set with --number) between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when a single coding question warrants a tight structured back-and-forth ending in user confirmation, rather than a full spec→plan→code workflow.
 argument-hint: "<question> [--number n] [--model high|xhigh]"
 ---
 
@@ -49,11 +49,11 @@ So `consult_handoff` + `consult_wait` are **orchestrator-only** verbs. If you we
 ## When to use
 
 - `/pair-consult <question>` (fresh) or `/pair-consult` (resume).
-- Work fits in one round of proposal — not a 5-step plan. If it doesn't fit, use [pair-coding](../pair-coding/SKILL.md).
+- Work fits in one round of proposal — not a 5-step plan. If it doesn't fit, break it into smaller questions or use a full planning workflow.
 - User wants a structured second opinion ending in their own go/no-go.
 - You were invoked as the peer by the active agent.
 
-**Don't use for:** multi-step implementation (use pair-coding), open-ended exploration (use brainstorming), one-shot code review (use `code-review`), or solo work.
+**Don't use for:** multi-step implementation (use a full planning workflow), open-ended exploration (use brainstorming), one-shot code review (use `code-review`), or solo work.
 
 ## Round protocol — one allowed action per round
 
@@ -211,7 +211,6 @@ While the loop runs:
 | Writing `STATUS: WAITING: A` (the role letter) | STATUS names the CLI: `WAITING: claude` / `WAITING: codex` — `consult_handoff` matches on the name. Read it off STATE.md's `A:` line. |
 | Invoking peer at the final round | The final round (`ROUND == ROUNDS`) ends the loop. Surface to user. |
 | R5 hides unresolved tensions | Surface them plainly. Let the user decide. |
-| Running consult alongside `.pair/` in the same repo | One session per repo. If both exist, abort `STATUS: BLOCKED: collision-with-pair-coding`. |
 | Idling after `consult_handoff` ("harness will notify me") | It won't — the peer is `nohup`'d, outside harness tracking. Always follow `consult_handoff` with `consult_wait` (via `Bash(run_in_background=true)` in Claude Code) so the harness has a tracked process to notify on. |
 | Telling the user "I'll wait for the peer" with no scheduled wakeup or background wait | Same root cause as above. The wait must be a real tracked process, not an intention. |
 
