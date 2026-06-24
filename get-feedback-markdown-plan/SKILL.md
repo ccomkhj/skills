@@ -1,10 +1,12 @@
 ---
 name: get-feedback-markdown-plan
 version: 1.0.0
-description: "Evaluates inline feedback annotations on a markdown plan by verifying each critique against the codebase and context using subagents."
+description: "DEPRECATED — use the pair-* skill series (e.g. pair-consult / pair-optimize) instead. Evaluates inline feedback annotations on a markdown plan by verifying each critique against the codebase and context using subagents."
 ---
 
 # Get Feedback on Markdown Plan
+
+> **⚠️ Deprecated.** Use the `pair-*` skill series (e.g. `pair-consult`, `pair-optimize`) instead. This skill is no longer installed and is kept only for reference.
 
 You have a markdown plan with inline feedback annotations (e.g., `[CODEX]`, `[Claude]`, or similar tags). Your job is to verify whether each annotation is correct by checking it against the codebase and project context.
 
