@@ -46,8 +46,13 @@ If a tool isn't in the toolbox, `haul-loop` doesn't reach for it.
 ## Process
 
 Explore the target first (read the file/module, recent commits, existing tests
-or benchmarks), then — grilling if vague — settle each section, **one question
-at a time**, multiple-choice when possible:
+or benchmarks). Then settle the sections — but match the instrument to the
+question:
+
+- **Unknown or fuzzy deliverable → grill, don't menu.** If you can't yet name the deliverable, you're in the vague branch above: discovering *what* and *why* is the `grilling` skill's job. A pre-baked multiple-choice menu presumes the answer it's supposed to find — don't railroad an open question into tabs.
+- **Bounded choice → `AskUserQuestion` tabs.** Once the deliverable is known, settle the genuinely enumerable sub-decisions (which repo, which layer, the threshold, the toolbox) with the tool: **one question per call**, 2–4 concrete options as tabs grounded in your exploration (the user can pick *Other* to free-type).
+
+Never dump the sections as a prose checklist.
 
 1. **What are we building or changing?** The specific deliverable; locate it in the repo.
 2. **What does "done" look like?** The success signal — measurable and transcript-demonstrable. Be stubborn here.

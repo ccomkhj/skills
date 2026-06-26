@@ -27,10 +27,11 @@ Keep it ≤ 4000 characters. Pull the end state and check straight from SPEC.md'
 
 If SPEC.md's success signal is missing, fuzzy, or not transcript-demonstrable,
 **do not paper over it** — the goal would loop forever, since the evaluator can
-never see the proof. Go back to the user and ask, one question at a time, until
-the end state is a single measurable thing with a check whose output Claude can
-print. This iteration is the point of the phase; don't shortcut it to produce a
-goal you know is unverifiable.
+never see the proof. Go back to the user with the `AskUserQuestion` tool — one
+question per call, each offering 2–4 concrete options as tabs (the user can pick
+*Other* to free-type) — until the end state is a single measurable thing with a
+check whose output Claude can print. This iteration is the point of the phase;
+don't shortcut it to produce a goal you know is unverifiable.
 
 ## Process
 

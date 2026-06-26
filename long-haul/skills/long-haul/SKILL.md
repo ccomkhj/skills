@@ -67,7 +67,7 @@ digraph long_haul {
 
 1. **Preflight.** `git rev-parse --git-dir` (worktrees need git). Confirm `/goal` is available (Claude Code ≥ v2.1.139); if not, offer to run the loop manually with a round cap instead. For an unattended *foreground* haul, note that `/goal` only auto-runs turns with **Auto mode** on (otherwise every tool call prompts), and `/goal` is disabled under `disableAllHooks`/`allowManagedHooksOnly` — flag if either bites. Missing git → tell the user, stop.
 2. **Resume vs fresh.** If `.longhaul/STATE.md` exists, read `PHASE`/`STATUS` and jump to that phase — do not restart. Otherwise create `.longhaul/`, append `.longhaul/` to `.gitignore`, write `STATE.md` (`PHASE: spec`, `STATUS: ACTIVE: orchestrator`, `ROUND: 0`, `ROUNDS: 8`, `MODE: -`, `STALL: 0`, `STALL_CAP: 2`, `INCUMBENT: none`, `SCORE: none`, `BASE: <git short-sha>`, `GOAL: pending`), and record the user's ask.
-3. **Drive the phases in order**, invoking each sibling skill. Update `PHASE` as you cross each boundary so a re-invocation resumes cleanly.
+3. **Drive the phases in order**, invoking each sibling skill. Update `PHASE` as you cross each boundary so a re-invocation resumes cleanly. If the user gave no ask, don't enumerate the spec questions yourself — go straight into `sharpen-spec`, which collects them via tabbed `AskUserQuestion` calls.
 
 ## The two gates — never skip these
 
