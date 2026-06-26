@@ -1,0 +1,20 @@
+{
+  "name": "long-haul",
+  "description": "Solo long-horizon goal loop: sharpen a spec (grill if vague), forge a /goal completion condition, then haul toward it turn after turn in a git worktree — each turn deciding explore (a fresh approach off the base) vs exploit (refine the incumbent), keeping only measured wins on a ratcheting incumbent branch, until the goal holds or the round cap trips. Then wrap up with a PR.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Huijo Kim",
+    "email": "huijo.kim@voids.ai"
+  },
+  "license": "MIT",
+  "keywords": [
+    "goal",
+    "long-horizon",
+    "loop",
+    "explore-exploit",
+    "incumbent",
+    "ratchet",
+    "worktree",
+    "orchestration"
+  ]
+}
