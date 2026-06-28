@@ -108,11 +108,16 @@ points at the main repo; "imports from tree directly, no action needed" if not).
 
 ## Acceptance gate (only if "done" has an expensive/external/one-shot tier)
 <the terminal gate from SPEC.md — what it is (prod job, deploy, sign-off), what it
-costs, how it's run, and the EXACT pasted evidence that proves it (a job-SUCCEEDED
-line, a query result). Run ONCE, late, after the ratchet is green and the incumbent
-is locked; its evidence is pasted into chat and persists for the evaluator. The
-goal holds only when BOTH the ratchet output and this evidence are in the
-transcript. Omit this section entirely if the ratchet is the whole condition.>
+costs, how it's run, and the EXACT pasted evidence that proves it as a
+before→predicted→after: a baseline value, a pre-registered prediction, and the
+invariants that must hold (e.g. "baseline 1890 dense -> predicted ~841 -> after
+matches, and the 91 real-sales pairs all survive"). Not a bare "job SUCCEEDED". Run
+ONCE, late, after the ratchet is green and the incumbent is locked; launched across
+turns (never block one turn for hours); its evidence is pasted into chat and
+persists for the evaluator. The goal holds only when BOTH the ratchet output and
+this evidence are in the transcript. If the gate consumes a pushed branch/CI
+artifact, the incumbent is the real working branch (not ephemeral longhaul/incumbent
+— see haul-loop). Omit this section entirely if the ratchet is the whole condition.>
 
 ## Notes
 <why the check is transcript-demonstrable; any risk the evaluator misreads it

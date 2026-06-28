@@ -16,7 +16,7 @@ terminal closing — see [Running in the background](#running-in-the-background)
 ## The contract
 
 - **The incumbent is a ratchet.** `INCUMBENT` (a branch tip + its recorded `SCORE` on the goal's check) holds the best result so far. Nothing replaces it unless it measures **strictly better**. The haul therefore never regresses — a bad attempt is simply discarded.
-- **Every attempt is isolated.** Each round spins one git worktree (`.longhaul/attempt/`) off the right base, you implement there, and only a measured win is merged. A failed attempt costs nothing.
+- **Every attempt is isolated.** Each round spins one git worktree (`.longhaul/attempt/`) off the right base, you implement there, and only a measured win is merged. A failed attempt costs nothing. (Where the acceptance gate consumes a pushed branch/CI artifact, the kept incumbent is the real working branch rather than an ephemeral `longhaul/incumbent` — see [the CI-artifact-gated exception](#the-incumbent-branch--set-it-up-once).)
 - **Every round's proof lands in chat.** After the round you re-state the goal's check output. That transcript is what the `/goal` evaluator reads to decide whether to continue.
 - **You stay inside the toolbox.** Use only the skills + MCP `SPEC.md` declared. A long autonomous run that reaches for undeclared tools is the drift the spec exists to prevent.
 - **Every git operation runs in `REPO`.** `BASE`, the worktrees, the incumbent branch, and the check all live in the target repo (`REPO` in `STATE.md`, where `.longhaul/` sits) — which may not be the cwd the haul was invoked from.
@@ -57,6 +57,18 @@ Record `INCUMBENT: longhaul/incumbent@<BASE>` and `SCORE: none` (no measured win
 yet). The incumbent branch only ever moves in step 6, and only on a measured
 win — so a losing attempt can never touch it.
 
+**Exception — CI-artifact-gated hauls.** When `GOAL.md`'s acceptance gate consumes
+a **pushed branch or a CI-built artifact** (e.g. a prod job that runs
+`image:<branch>` built by CI on push), an ephemeral local-only incumbent can't feed
+the gate — the gate needs a *real, pushed* branch. In that mode, make the incumbent
+the **existing working branch** (don't invent `longhaul/incumbent`); record it as
+`INCUMBENT: <branch>@<sha>`. The ratchet's worktree isolation (steps 3–6) still
+governs each local code attempt — you still attempt in a throwaway worktree and only
+fast-forward a measured win onto the working branch — but the *kept* incumbent is
+pushable, and the gate runs on the pushed incumbent. Decide this once, at setup,
+from `GOAL.md`'s gate; don't silently drift into committing on the working branch
+mid-haul (the live ADR-0003 run did exactly that, bypassing the whole contract).
+
 ## One round
 
 1. **Pick the mode.** First, **honor the single-driver lock** — if `.longhaul/bg.pid` names a live process, a background driver owns this haul; do not run a round, report `haul_bg_status` and stop. Otherwise: apply the stall rule + escape hatch, read `## Tried` if exploring, record `MODE` and the reason in `R<N>.md` and `STATE.md`, set `STATUS: HAULING: R<N>`.
@@ -80,21 +92,44 @@ win — so a losing attempt can never touch it.
 
 When `GOAL.md` carries an **acceptance gate** (an expensive/external/one-shot
 tier — a prod job, a deploy, a sign-off), the per-round loop above optimizes the
-**ratchet** only; the gate is a separate, terminal act:
+**ratchet** only; the gate is a separate, terminal **phase**, not a round — don't
+tick `ROUND` for it, and don't fold it into the same turn as the ratchet work.
 
-- **Don't run it every round.** It costs hours and real money — running it each
-  turn is the waste the two-tier split exists to prevent. Most rounds never touch it.
-- **Fire it once, when the ratchet is green and the incumbent is locked** — i.e.
-  the ratchet score holds and further rounds aren't improving it. Run the gate
-  (within the toolbox — e.g. the prod job via its skill), then **paste its evidence
-  into chat verbatim**: the job-SUCCEEDED line, the query result, the sign-off. That
-  evidence persists in the transcript, so the `/goal` evaluator keeps seeing it.
-- **Only then is the goal met.** `GOAL-MET` requires *both* the ratchet output
-  (re-printed this round) and the gate's pasted evidence present. A green ratchet
-  with no gate evidence is **not** done — end the turn and fire the gate next.
-- **If the gate fails**, it's a finding, not a win: the ratchet may be green while
-  the real artifact is wrong. Treat the failure as the next round's brief (a fix to
-  exploit), and don't mark `GOAL-MET`.
+**Don't run it every round.** It costs hours and real money — running it each turn
+is the waste the two-tier split exists to prevent. Most rounds never touch it. Fire
+it **once**, after the ratchet is green and the incumbent is locked (the score holds
+and further rounds aren't improving it).
+
+**Pre-register the expected result before you spend the money.** A bare "job
+SUCCEEDED" proves nothing about *correctness*. Before firing, with the toolbox's
+read-only tools (e.g. the DB MCP), capture and paste:
+- the **baseline** the gate should change (e.g. the current dense series count),
+- a **pre-registered prediction** of the post-gate value, computed from the inputs
+  (e.g. "841 = 91 sold pairs + 25 never-sold × 30"), and
+- an **invariant / survival set** to re-check afterward (e.g. the exact rows that
+  must NOT disappear), plus any **corner case** that could silently corrupt the
+  result (e.g. bundle-only sales that might be wrongly pruned).
+Then the gate's evidence is a real *before → predicted → after* with invariants held
+— not an unfalsifiable green. This is what the live ADR-0003 run did well; make it
+the rule, not a lucky instinct.
+
+**Run it across turns — never block one turn for hours.** A multi-hour gate
+(CI image build → multi-job prod run → polling) must be **launched, then the turn
+ends**; subsequent `/goal` turns poll status and proceed. Submit the job
+(background or fire-and-record-the-id), print what's pending, and end the turn —
+don't churn synchronously for 15+ minutes holding the turn open. Each later turn:
+check the job, advance to the next stage or keep waiting, end the turn. Use
+`ScheduleWakeup` for external state the harness can't notify you about.
+
+**Paste evidence verbatim; only then is the goal met.** When the gate completes,
+paste the job-SUCCEEDED line and the after-query against the pre-registered baseline
+(prediction matched, invariants held). `GOAL-MET` requires *both* the ratchet output
+(re-printed) and this gate evidence present — a green ratchet with no gate evidence
+is **not** done.
+
+**If the gate fails**, it's a finding, not a win: the ratchet may be green while the
+real artifact is wrong. Treat the failure as the next round's brief (a fix to
+exploit), and don't mark `GOAL-MET`.
 
 A goal with no acceptance gate skips all of this — the ratchet is the whole signal.
 

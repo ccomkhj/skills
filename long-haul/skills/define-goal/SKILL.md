@@ -64,7 +64,10 @@ evaluator from declaring victory on the cheap half:
   sign-off — is *pasted into chat once and persists* there, so the evaluator keeps
   seeing it on later turns. State explicitly that the goal holds **only when both**
   the ratchet output **and** the gate's pasted evidence are in the transcript, so a
-  ratchet-green-only turn does not trip completion.
+  ratchet-green-only turn does not trip completion. Phrase the gate's evidence as a
+  **before → predicted → after** (a baseline, a pre-registered predicted value, and
+  invariants that must hold), not a bare "succeeded" — so the pasted proof is
+  falsifiable. `haul-loop` captures the baseline/prediction before firing.
 
 A pure cheap-and-headless goal has no gate — the ratchet is the whole condition.
 
