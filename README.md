@@ -31,6 +31,22 @@ My personal skills.
 npx skills add ccomkhj/skills
 ```
 
+`long-haul` and `pair-goal` are multi-skill plugins, so their bundled skills live one level deeper than the flat scan looks. To install them via `npx skills`, add `--full-depth`:
+
+```bash
+npx skills add ccomkhj/skills --full-depth
+```
+
+### As Claude Code plugins
+
+`long-haul` and `pair-goal` are also published as Claude Code plugins (bundled skills + shared state). Inside Claude Code:
+
+```
+/plugin marketplace add ccomkhj/skills
+/plugin install long-haul@ccomkhj-skills
+/plugin install pair-goal@ccomkhj-skills
+```
+
 ### Manual setup
 
 Alternatively, clone the repo and symlink it:

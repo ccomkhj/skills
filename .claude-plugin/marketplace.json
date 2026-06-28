@@ -1,0 +1,17 @@
+{
+  "name": "ccomkhj-skills",
+  "owner": {
+    "name": "Huijo Kim",
+    "email": "ccomkhj@gmail.com"
+  },
+  "plugins": [
+    {
+      "source": "./long-haul",
+      "name": "long-haul"
+    },
+    {
+      "source": "./pair-goal",
+      "name": "pair-goal"
+    }
+  ]
+}
