@@ -22,7 +22,9 @@ STALL: 0               # consecutive rounds with no improvement to the incumbent
 STALL_CAP: 2           # rounds of no progress that force an explore
 INCUMBENT: none        # longhaul/incumbent@<sha> once it exists; "none" before round 1 creates it
 SCORE: none            # the incumbent's measured value, e.g. "p95=41ms" or "8/10 tests"; "none" until first kept win
-BASE: <short-sha>      # the commit the haul started from — where the incumbent branch and explore attempts fork
+REPO: <abs path>       # the target repo — owns BASE, worktrees, the incumbent branch, the PR; may differ from cwd
+BASE: <short-sha>      # the commit (in REPO) the haul started from — where the incumbent branch and explore attempts fork
+GATES: approve_goal=required confirm_pr=required   # confirm_pr=auto for an accepted unattended finish (draft PR, no park)
 GOAL: pending          # one-line restatement of the /goal condition (set by define-goal)
 
 ## Tried (explored approaches already rejected — don't re-explore)
@@ -46,13 +48,20 @@ re-invoked `/long-haul` resume at the right step.
 ```
 # Spec
 
+## Target repo
+<abs path of the repo that owns the deliverable — may differ from the invocation
+cwd. BASE, worktrees, the incumbent, and the PR all live here.>
+
 ## What we're building / changing
-<the deliverable — file/module/endpoint/behavior — located in the repo>
+<the deliverable — file/module/endpoint/behavior — located in the target repo>
 
 ## Done looks like (success signal — must be transcript-demonstrable)
 <the measurable check whose output Claude can show: a test exit code, a
 benchmark number a script prints, a file count, a lint result. Because /goal's
-evaluator only reads the conversation, this must be provable in chat.>
+evaluator only reads the conversation, this must be provable in chat. If the real
+artifact isn't headlessly runnable, name the runnable proxy — a committed test
+standing in for it, ideally one that also guards regression in CI — and note any
+live-MCP/container confirmation as belt-and-suspenders.>
 
 ## Toolbox — the skills + MCP this haul may use
 - Skills: <e.g. /tdd, /review, check-voids-db — or "none beyond core editing">
@@ -83,6 +92,11 @@ Written so Claude's own output demonstrates it. Example:
 
 ## The line to run
 /goal <the condition above on one logical line>
+
+## Proof line (echoed verbatim each round, re-run at wrap-up)
+<the exact command whose output proves the condition, e.g.
+`pytest tests/pricing -q && python bench/price.py`. Must be a named command with
+transcript-visible output — a goal whose proof never lands loops forever.>
 
 ## Notes
 <why the check is transcript-demonstrable; any risk the evaluator misreads it>

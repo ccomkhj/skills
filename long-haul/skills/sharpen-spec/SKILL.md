@@ -23,6 +23,14 @@ wherever you can rather than asking.
 Don't grill a spec that's already sharp. Two or three pointed questions can be
 enough; a fully-specified ask needs none.
 
+## Find the source of truth first
+
+Before any menu, ask the cheapest question there is: *"Is there a file, ticket,
+PR comment, or person that defines what 'done' means here?"* One pointer often
+reframes the whole deliverable — a single file can turn "resolve this PR" into a
+concrete change. Let the user hand you that source before you presume an answer
+space.
+
 ## The one thing that matters most
 
 `define-goal` (the next phase) needs a **transcript-demonstrable success
@@ -31,6 +39,14 @@ tools. So you are not done until you have a check whose *output Claude can show*
 a test that exits 0, a benchmark number a script prints, a file count, a lint
 result. "Better" or "working" without a number is not a signal — push until it's
 concrete.
+
+Then probe whether it's *headlessly* demonstrable: can Claude run it and show the
+output in a transcript? If the real artifact can't be (an Airflow DAG with no
+local `airflow`, a service needing a live container), record the **runnable
+proxy** — a committed test that stands in for it (e.g. a static/AST check of the
+DAG's task order) — and prefer the proxy that doubles as a CI regression guard.
+Note any live-MCP/container confirmation as belt-and-suspenders, but the proxy is
+what the `/goal` signal rides on.
 
 ## The toolbox — declare it in the spec
 
@@ -49,13 +65,13 @@ Explore the target first (read the file/module, recent commits, existing tests
 or benchmarks). Then settle the sections — but match the instrument to the
 question:
 
-- **Unknown or fuzzy deliverable → grill, don't menu.** If you can't yet name the deliverable, you're in the vague branch above: discovering *what* and *why* is the `grilling` skill's job. A pre-baked multiple-choice menu presumes the answer it's supposed to find — don't railroad an open question into tabs.
-- **Bounded choice → `AskUserQuestion` tabs.** Once the deliverable is known, settle the genuinely enumerable sub-decisions (which repo, which layer, the threshold, the toolbox) with the tool: **one question per call**, 2–4 concrete options as tabs grounded in your exploration (the user can pick *Other* to free-type).
+- **Hard gate before the first `AskUserQuestion`.** Don't open a menu until (a) you've let the user point you at the source of truth, and (b) you've confirmed the deliverable is genuinely *enumerable*. If either is unmet, ask **one open question in plain chat** — a menu presumes the answer space it's meant to discover. And read a rejected menu as a signal: when the user clarifies or rejects your tabs, the *deliverable* isn't pinned yet — drop back to open grilling, don't reissue a reworded menu.
+- **Bounded choice → `AskUserQuestion` tabs.** Once the deliverable is known and enumerable, settle the genuinely bounded sub-decisions (which repo, which layer, the threshold, the toolbox) with the tool: **one question per call**, 2–4 concrete options as tabs grounded in your exploration (the user can pick *Other* to free-type).
 
 Never dump the sections as a prose checklist.
 
-1. **What are we building or changing?** The specific deliverable; locate it in the repo.
-2. **What does "done" look like?** The success signal — measurable and transcript-demonstrable. Be stubborn here.
+1. **What are we building or changing?** The specific deliverable; locate it — which **repo** (`target_repo`, which may not be cwd), then which file/module/endpoint/behavior.
+2. **What does "done" look like?** The success signal — measurable and transcript-demonstrable, with the runnable proxy if the real artifact isn't headlessly verifiable. Be stubborn here.
 3. **The toolbox** — which skills + MCP the haul may use (above).
 4. **Constraints** — what must hold throughout (public API, deps, behavior other code relies on).
 5. **Out of scope** — guard against scope creep over a long run; YAGNI.

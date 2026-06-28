@@ -65,18 +65,44 @@ digraph long_haul {
 
 ## On invocation
 
-1. **Preflight.** `git rev-parse --git-dir` (worktrees need git). Confirm `/goal` is available (Claude Code ≥ v2.1.139); if not, offer to run the loop manually with a round cap instead. For an unattended *foreground* haul, note that `/goal` only auto-runs turns with **Auto mode** on (otherwise every tool call prompts), and `/goal` is disabled under `disableAllHooks`/`allowManagedHooksOnly` — flag if either bites. Missing git → tell the user, stop.
-2. **Resume vs fresh.** If `.longhaul/STATE.md` exists, read `PHASE`/`STATUS` and jump to that phase — do not restart. Otherwise create `.longhaul/`, append `.longhaul/` to `.gitignore`, write `STATE.md` (`PHASE: spec`, `STATUS: ACTIVE: orchestrator`, `ROUND: 0`, `ROUNDS: 8`, `MODE: -`, `STALL: 0`, `STALL_CAP: 2`, `INCUMBENT: none`, `SCORE: none`, `BASE: <git short-sha>`, `GOAL: pending`), and record the user's ask.
+1. **Preflight** (next section). Stop on a hard failure; flag a soft one with the phase it will **block at**.
+2. **Resume vs fresh.** If `<REPO>/.longhaul/STATE.md` exists, read `PHASE`/`STATUS` and jump to that phase — do not restart. Otherwise create `.longhaul/` **under the target repo** (`REPO`, resolved in preflight), append `.longhaul/` to its `.gitignore`, write `STATE.md` (`PHASE: spec`, `STATUS: ACTIVE: orchestrator`, `ROUND: 0`, `ROUNDS: 8`, `MODE: -`, `STALL: 0`, `STALL_CAP: 2`, `INCUMBENT: none`, `SCORE: none`, `REPO: <abs path>`, `BASE: <REPO's git short-sha>`, `GATES: approve_goal=required confirm_pr=required`, `GOAL: pending`), and record the user's ask.
 3. **Drive the phases in order**, invoking each sibling skill. Update `PHASE` as you cross each boundary so a re-invocation resumes cleanly. If the user gave no ask, don't enumerate the spec questions yourself — go straight into `sharpen-spec`, which collects them via tabbed `AskUserQuestion` calls.
+
+## Preflight
+
+Everything a later phase needs, checked before it's too late to fix cheaply. A
+*hard* failure stops the run; a *soft* one is flagged with the phase it will
+**block at** — say "this will block at X" rather than letting the user discover
+it after they've disconnected.
+
+1. **Git** — `git rev-parse --git-dir`. Worktrees need it. Missing → stop.
+2. **Target repo.** The deliverable's repo may differ from the invocation cwd. If the ask names a file, a PR, or an artifact ("the DAG") that lives outside cwd, or sibling git repos sit alongside it, **ask which repo owns the deliverable** before writing any state. That repo is `REPO`; **all `.longhaul/` state, `BASE`, worktrees, the incumbent branch, and the eventual PR live under it**, not cwd. Default `REPO` to cwd's repo toplevel when they're the same.
+3. **Resolve "this PR".** If the ask says "this PR" / "the PR", it has no referent until you pin it: in `REPO`, `gh pr view` for the current branch, else `gh pr list --search`. **Echo the resolved PR (number, title, base) back for confirmation** before sharpening — the branch you're on may have no PR while a sibling branch at the same SHA does.
+4. **/goal availability** — Claude Code ≥ v2.1.139. Missing → offer to run the loop manually with a round cap instead.
+5. **Wrap-up deps.** `wrap-up` opens a PR, so verify now, not at the end: `gh` present + authed (`gh auth status`), `REPO`'s remote reachable, push permission. Missing → soft-flag "blocks at wrap-up".
+6. **Detach readiness** *(only if the run is meant to go unattended — foreground Auto-mode or `--background`)*. An unattended haul that hits any interactive stop parks until a human returns, so confirm the whole path is clear:
+   - **Auto mode on** — `/goal` only auto-runs turns with it; otherwise every tool call prompts. (Foreground only.)
+   - **Hooks not disabled** — `/goal` is off under `disableAllHooks` / `allowManagedHooksOnly`.
+   - **`confirm_pr=auto`** in `GATES` — the default `required` parks forever before the PR.
+   - **Background only:** `check.sh` written, `haul_bg_start` available (`reference/haul-bg.sh`), host stays powered.
+   Any unmet item → name it and the step it blocks at.
 
 ## The two gates — never skip these
 
 | Gate | When | What you do |
 |---|---|---|
 | **approve-goal** | after `define-goal` | Show `GOAL.md`'s condition and the `/goal …` line. Wait for the user to edit/approve and to actually run `/goal`. Do not start hauling until the goal is active. |
-| **confirm-pr** | in `wrap-up` | Show the branch name + commit list + PR body. Only push/open after the user confirms. |
+| **confirm-pr** | in `wrap-up` | Show the branch name + commit list + PR body. Only push/open after the user confirms — *unless* `GATES` sets `confirm_pr=auto`. |
 
 Set `STATUS: WAITING-USER: <gate>` while waiting so a resume knows it's parked on a human.
+
+**Gate policy.** `GATES` in `STATE.md` sets each gate's mode. `approve_goal` is
+always `required` — only the user can run `/goal`. `confirm_pr` is `required`
+(default — `wrap-up` parks for a yes) or `auto` (for an unattended finish —
+`wrap-up` opens a *draft* PR without parking and never pushes to a protected or
+default branch). Set `confirm_pr=auto` only once the user has accepted an
+unattended finish.
 
 ## Phase ownership
 

@@ -23,6 +23,20 @@ four parts:
 Keep it ≤ 4000 characters. Pull the end state and check straight from SPEC.md's
 "Done looks like".
 
+## The proof line — make the check transcript-visible
+
+The evaluator only sees chat, so the condition's check must be a **named command
+whose output appears in the transcript** — not "the tests pass" but `pytest
+tests/x -q` with its exit line shown. **Reject any success signal that isn't**: if
+proving it needs a tool run, *running it and surfacing the output* is part of the
+loop's job. Emit a copy-pasteable **proof line** — the exact command — that
+`haul-loop` echoes verbatim each round and `wrap-up` re-runs at the end. A goal
+whose proof never lands loops forever.
+
+When the real artifact isn't locally runnable, the proof line rides on the
+**committed-test proxy** named in `SPEC.md` (e.g. a static/AST check standing in
+for a live Airflow run).
+
 ## Iterate until the end state is clear
 
 If SPEC.md's success signal is missing, fuzzy, or not transcript-demonstrable,
@@ -37,7 +51,7 @@ don't shortcut it to produce a goal you know is unverifiable.
 
 1. Read `.longhaul/SPEC.md`. If the success signal isn't measurable + demonstrable, iterate with the user (above) before drafting.
 2. Draft the condition with the four parts above, on one logical line.
-3. Write `.longhaul/GOAL.md` (template in [../long-haul/reference/file-formats.md](../long-haul/reference/file-formats.md)): the condition, the literal `/goal …` line, and a note on why the check is transcript-demonstrable.
+3. Write `.longhaul/GOAL.md` (template in [../long-haul/reference/file-formats.md](../long-haul/reference/file-formats.md)): the condition, the literal `/goal …` line, the **proof line** (the exact command the loop echoes each round), and a note on why the check is transcript-demonstrable.
 4. Set `GOAL:` (one-line restatement) in `STATE.md`, advance `PHASE: haul`.
 
 ## The gate — the user runs /goal

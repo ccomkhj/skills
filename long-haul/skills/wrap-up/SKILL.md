@@ -29,9 +29,13 @@ honest partial beats an overstated win.
 
 ## Ship — branch, confirm, PR
 
+All git/`gh` operations run in `REPO` (from `STATE.md`) — the deliverable's repo,
+which may not be the cwd the haul was invoked from. The PR opens against `REPO`'s
+remote, not cwd's.
+
 1. **Branch.** The kept work is the `longhaul/incumbent` branch (its commits, from `BASE`). Rename it to a readable feature branch for the PR — `git branch -m longhaul/incumbent longhaul/<short-topic>` — never open a PR from the default branch. Delete any leftover `longhaul/attempt-*` scratch branches and `git worktree prune` so the PR carries only the kept work, not attempt scaffolding. The PR's base is `BASE`'s branch.
-2. **Confirm — the gate.** Show the user: the branch name, the commit list (`git log <BASE>..HEAD --oneline`), and the proposed PR title + body (from `SUMMARY.md`). Set `STATUS: WAITING-USER: confirm-pr`. Wait for an explicit yes.
-3. **Push + PR.** On confirmation: `git push -u origin <branch>`, then `gh pr create --title "…" --body "…"`. Report the PR URL — don't claim it's open until `gh` returns one.
+2. **Confirm — the gate.** Show the user: the branch name, the commit list (`git log <BASE>..HEAD --oneline`), and the proposed PR title + body (from `SUMMARY.md`). If `GATES` sets `confirm_pr=required` (the default), set `STATUS: WAITING-USER: confirm-pr` and wait for an explicit yes. If `confirm_pr=auto` (an accepted unattended finish), skip the wait, open the PR as a **draft**, and never push to a protected or default branch.
+3. **Push + PR.** `git push -u origin <branch>`, then `gh pr create --title "…" --body "…"` (add `--draft` under `confirm_pr=auto`). Report the PR URL — don't claim it's open until `gh` returns one.
 4. **Finish.** Set `STATUS: DONE`, `PHASE: wrap` in `STATE.md`. Tear down any stray worktree (`git worktree prune`). Ask whether to delete `.longhaul/` now or keep it (it's gitignored either way). If `/goal` is somehow still active, remind the user it auto-clears on success, or to `/goal clear`.
 
 ## PR body shape

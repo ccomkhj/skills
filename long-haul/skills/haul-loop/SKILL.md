@@ -19,6 +19,7 @@ terminal closing — see [Running in the background](#running-in-the-background)
 - **Every attempt is isolated.** Each round spins one git worktree (`.longhaul/attempt/`) off the right base, you implement there, and only a measured win is merged. A failed attempt costs nothing.
 - **Every round's proof lands in chat.** After the round you re-state the goal's check output. That transcript is what the `/goal` evaluator reads to decide whether to continue.
 - **You stay inside the toolbox.** Use only the skills + MCP `SPEC.md` declared. A long autonomous run that reaches for undeclared tools is the drift the spec exists to prevent.
+- **Every git operation runs in `REPO`.** `BASE`, the worktrees, the incumbent branch, and the check all live in the target repo (`REPO` in `STATE.md`, where `.longhaul/` sits) — which may not be the cwd the haul was invoked from.
 
 ## Explore vs exploit — the decision that opens each round
 
@@ -72,7 +73,7 @@ win — so a losing attempt can never touch it.
    - **Win, explore** (attempt forked off `BASE` → different lineage): `git reset --hard longhaul/attempt-r<N>` — the incumbent now points at the explored lineage.
    - Either win → update `INCUMBENT`/`SCORE`, set `STALL: 0`.
    - **Not a win** → keep nothing (incumbent untouched). Increment `STALL`. If it was an explore, append the approach + its score to `## Tried`.
-7. **Prove it in chat.** The main tree already holds the incumbent — **re-run the stated check there and print its output**. This is the transcript the `/goal` evaluator judges. Note in `R<N>.md` what's still short of the goal.
+7. **Prove it in chat.** The main tree already holds the incumbent — **re-run `GOAL.md`'s proof line there and print its output verbatim**. This is the transcript the `/goal` evaluator judges; the same command every round is what lets it decide. Note in `R<N>.md` what's still short of the goal.
 8. **Tear down + advance.** `git worktree remove .longhaul/attempt --force`, `git branch -D longhaul/attempt-r<N>`, `git worktree prune`. Bump `ROUND`; append a one-line `R<N>` entry to `STATE.md`'s round log. **Then check the proof from step 7: if the goal condition now holds, set `PHASE: wrap`, `STATUS: GOAL-MET`, and proceed to `wrap-up`** — don't rely on `/goal`'s evaluator alone to route you. Otherwise end the turn; `/goal` decides whether to start another.
 
 ## Running in the background

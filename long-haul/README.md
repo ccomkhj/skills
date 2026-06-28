@@ -80,7 +80,14 @@ worktree.
 Everything auto-advances except:
 
 1. **Approve the goal** — you read the `/goal …` line `define-goal` produces and run it yourself (slash commands are user-invoked).
-2. **Confirm the PR** — `wrap-up` shows the branch + PR body before pushing.
+2. **Confirm the PR** — `wrap-up` shows the branch + PR body before pushing. Configurable: `GATES: confirm_pr=auto` lets an accepted unattended run open a *draft* PR without parking.
+
+For an unattended run, the orchestrator's **detach-readiness** preflight checks
+the whole path is clear (Auto mode, hooks, `confirm_pr=auto`, and — for
+`--background` — `check.sh` + `haul_bg_start`) so it can't silently park after
+you've disconnected. The deliverable's repo is **`target_repo`**, which may
+differ from the invocation cwd — `BASE`, worktrees, the incumbent, and the PR all
+follow it.
 
 ## Shared state — `.longhaul/`
 
@@ -91,7 +98,7 @@ pattern as the sibling `pair-*` skills:
 |---|---|
 | `SPEC.md` | deliverable, success signal, toolbox, constraints (from sharpen-spec) |
 | `GOAL.md` | the `/goal` condition + the literal line to run (from define-goal) |
-| `STATE.md` | `PHASE`, `STATUS` (incl. `GOAL-MET` → the durable loop→wrap handoff), `ROUND`/`ROUNDS`, `MODE`, `STALL`, `INCUMBENT`/`SCORE`, `BASE`, the `## Tried` list, the round log |
+| `STATE.md` | `PHASE`, `STATUS` (incl. `GOAL-MET` → the durable loop→wrap handoff), `ROUND`/`ROUNDS`, `MODE`, `STALL`, `INCUMBENT`/`SCORE`, `REPO`, `BASE`, `GATES`, the `## Tried` list, the round log |
 | `R<N>.md` | per-round: mode + why, the attempt, the check output, the verdict |
 | `SUMMARY.md` | goal vs achieved, the explore/exploit path, net kept diff |
 | `attempt/` | the per-round git worktree (created/torn down each round) |
