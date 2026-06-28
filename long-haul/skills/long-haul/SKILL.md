@@ -87,6 +87,15 @@ it after they've disconnected.
    - **`confirm_pr=auto`** in `GATES` — the default `required` parks forever before the PR.
    - **Background only:** `check.sh` written, `haul_bg_start` available (`reference/haul-bg.sh`), host stays powered.
    Any unmet item → name it and the step it blocks at.
+7. **Toolbox reachability + cost.** The spec's toolbox may name heavy or paid
+   means — an MCP server (is it authed and responding?), an external/prod runner
+   (SageMaker, a deploy target), a live DB. Two things to surface now: (a) any
+   tool the haul will need but **can't reach** (unauthed MCP, missing CLI) →
+   soft-flag with the phase it blocks at; (b) any toolbox step that **spends real
+   money or mutates production** — typically the acceptance gate (`GOAL.md`) — →
+   say so plainly ("this haul will incur prod compute at the acceptance gate"), so
+   the user opts into the cost before the loop, not after a surprise bill. A long
+   autonomous run that fires paid infra is not bounded by the per-round worktree.
 
 ## The two gates — never skip these
 

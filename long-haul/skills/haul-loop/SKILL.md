@@ -67,14 +67,36 @@ win — so a losing attempt can never touch it.
    ```
    `<base>` is `longhaul/incumbent` (exploit) or `BASE` (explore). Before the first win, both are the same commit, so round 1 works either way.
 4. **Implement — follow the /implement contract.** `/implement` is user-invoked, so inside this turn you execute its contract yourself, in the worktree (`cd .longhaul/attempt`): build the work per the brief; use `/tdd` at the pre-agreed seams; typecheck regularly; run targeted tests often and the full suite at the end; **commit continuously** as you go (the progress must accrete in git, not live in the working tree). Stay within the toolbox.
-5. **Measure.** Run the goal's **stated check** in the worktree and capture its output. This output is the attempt's `SCORE`.
+5. **Measure.** Run the goal's **ratchet check** (the per-round proof line) in the worktree and capture its output. This output is the attempt's `SCORE`. (The acceptance gate, if `GOAL.md` has one, is *not* run here — see [The acceptance gate](#the-acceptance-gate--fire-it-once-late).)
 6. **Ratchet — keep only a measured win.** Decide if the attempt is a win: if `SCORE: none` (no incumbent yet), **any attempt that passes the check** is the first win; otherwise it must beat the incumbent's score. From the main tree (which holds `longhaul/incumbent`):
    - **Win, exploit** (attempt forked off the incumbent → linear): `git merge --ff-only longhaul/attempt-r<N>`.
    - **Win, explore** (attempt forked off `BASE` → different lineage): `git reset --hard longhaul/attempt-r<N>` — the incumbent now points at the explored lineage.
    - Either win → update `INCUMBENT`/`SCORE`, set `STALL: 0`.
    - **Not a win** → keep nothing (incumbent untouched). Increment `STALL`. If it was an explore, append the approach + its score to `## Tried`.
 7. **Prove it in chat.** The main tree already holds the incumbent — **re-run `GOAL.md`'s proof line there and print its output verbatim**. This is the transcript the `/goal` evaluator judges; the same command every round is what lets it decide. Note in `R<N>.md` what's still short of the goal.
-8. **Tear down + advance.** `git worktree remove .longhaul/attempt --force`, `git branch -D longhaul/attempt-r<N>`, `git worktree prune`. Bump `ROUND`; append a one-line `R<N>` entry to `STATE.md`'s round log. **Then check the proof from step 7: if the goal condition now holds, set `PHASE: wrap`, `STATUS: GOAL-MET`, and proceed to `wrap-up`** — don't rely on `/goal`'s evaluator alone to route you. Otherwise end the turn; `/goal` decides whether to start another.
+8. **Tear down + advance.** `git worktree remove .longhaul/attempt --force`, `git branch -D longhaul/attempt-r<N>`, `git worktree prune`. Bump `ROUND`; append a one-line `R<N>` entry to `STATE.md`'s round log. **Then check the proof from step 7: if the goal condition now holds, set `PHASE: wrap`, `STATUS: GOAL-MET`, and proceed to `wrap-up`** — don't rely on `/goal`'s evaluator alone to route you. **But if `GOAL.md` has an acceptance gate, the condition is *not* met on a green ratchet alone — the gate's pasted evidence must also be in the transcript (see below).** Otherwise end the turn; `/goal` decides whether to start another.
+
+## The acceptance gate — fire it once, late
+
+When `GOAL.md` carries an **acceptance gate** (an expensive/external/one-shot
+tier — a prod job, a deploy, a sign-off), the per-round loop above optimizes the
+**ratchet** only; the gate is a separate, terminal act:
+
+- **Don't run it every round.** It costs hours and real money — running it each
+  turn is the waste the two-tier split exists to prevent. Most rounds never touch it.
+- **Fire it once, when the ratchet is green and the incumbent is locked** — i.e.
+  the ratchet score holds and further rounds aren't improving it. Run the gate
+  (within the toolbox — e.g. the prod job via its skill), then **paste its evidence
+  into chat verbatim**: the job-SUCCEEDED line, the query result, the sign-off. That
+  evidence persists in the transcript, so the `/goal` evaluator keeps seeing it.
+- **Only then is the goal met.** `GOAL-MET` requires *both* the ratchet output
+  (re-printed this round) and the gate's pasted evidence present. A green ratchet
+  with no gate evidence is **not** done — end the turn and fire the gate next.
+- **If the gate fails**, it's a finding, not a win: the ratchet may be green while
+  the real artifact is wrong. Treat the failure as the next round's brief (a fix to
+  exploit), and don't mark `GOAL-MET`.
+
+A goal with no acceptance gate skips all of this — the ratchet is the whole signal.
 
 ## Running in the background
 
@@ -90,14 +112,23 @@ Three things differ from foreground, and you must set them up before detaching:
 
 - **The check becomes a script.** `/goal`'s evaluator is gone, so the driver
   decides "goal met" by running `.longhaul/check.sh` (exit 0 = met). If it
-  doesn't exist, write it from `GOAL.md`'s stated check — the runnable form,
+  doesn't exist, write it from `GOAL.md`'s **ratchet** check — the runnable form,
   exit 0 when the condition holds, printing the measured value (template in
   [../long-haul/reference/file-formats.md](../long-haul/reference/file-formats.md)).
-  Confirm it with the user.
+  Confirm it with the user. **`check.sh` can only express the ratchet** — an
+  acceptance gate (a prod job, a deploy, a sign-off) can't be reduced to an
+  exit-0 between-rounds script, so a goal that *requires* a gate is **not fully
+  background-able**: the detached driver can ratchet to green unattended, but the
+  gate stays a foreground/manual terminal step. Say this — don't let the user
+  detach expecting the gate to fire itself.
 - **No human approves tool calls.** The driver runs `claude` with
-  `--permission-mode bypassPermissions`; there's no one there overnight. Blast
-  radius is bounded by the per-round worktree, but say this plainly and get the
-  user's go-ahead before detaching.
+  `--permission-mode bypassPermissions`; there's no one there overnight. For pure
+  code rounds the blast radius is bounded by the per-round worktree — **but that
+  bound is false the moment a round's check or toolbox reaches external or paid
+  infra** (a prod job, a deploy, an MCP write): with no human in the loop it can
+  spend real money and mutate production. If the toolbox includes anything like
+  that, say so plainly and get explicit go-ahead before detaching — or keep the
+  gate out of the background run entirely.
 - **Progress lands in a file, not chat.** Each round's agent appends one
   structured block to `.longhaul/PROGRESS.log` (the `[LoopN]` template — see
   file-formats). That file is how the user checks in on a detached run.

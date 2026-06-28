@@ -37,6 +37,37 @@ When the real artifact isn't locally runnable, the proof line rides on the
 **committed-test proxy** named in `SPEC.md` (e.g. a static/AST check standing in
 for a live Airflow run).
 
+### Pin how the check is invoked — a green proof can lie
+
+The proof line is only trustworthy if it runs the *right code in the right
+environment*. Record the **exact invocation** in `GOAL.md`, not just the command:
+which interpreter / venv / conda env (e.g. `/opt/miniconda3/envs/dp/bin/python`,
+not bare `python`), and — when the haul runs in a **git worktree** — whether the
+worktree actually executes the worktree's code. Editable installs are the classic
+trap: an editable `pip install -e` points at the *main* repo, so a worktree
+executable silently runs old code unless `PYTHONPATH=<worktree-root>` is set, and
+the haul "passes" against code it never changed. If the check imports the package
+directly from the tree (most pytest layouts) it's fine — but say which case
+applies. A proof that's secretly run in the wrong env is worse than no proof.
+
+### When "done" has a ratchet AND an acceptance gate
+
+If `SPEC.md` names two tiers (a cheap per-round **ratchet check** and an
+expensive/external/one-shot **acceptance gate**), the condition carries **both**,
+but they play different roles — and saying so in the `/goal` text is what stops the
+evaluator from declaring victory on the cheap half:
+
+- The **ratchet** is re-run and re-printed every round; it's the measurable end
+  state the loop optimizes.
+- The **acceptance gate** is run **once**, late, after the ratchet is green and the
+  incumbent is locked. Its evidence — a job-SUCCEEDED line, a query result, a
+  sign-off — is *pasted into chat once and persists* there, so the evaluator keeps
+  seeing it on later turns. State explicitly that the goal holds **only when both**
+  the ratchet output **and** the gate's pasted evidence are in the transcript, so a
+  ratchet-green-only turn does not trip completion.
+
+A pure cheap-and-headless goal has no gate — the ratchet is the whole condition.
+
 ## Iterate until the end state is clear
 
 If SPEC.md's success signal is missing, fuzzy, or not transcript-demonstrable,
@@ -51,7 +82,7 @@ don't shortcut it to produce a goal you know is unverifiable.
 
 1. Read `.longhaul/SPEC.md`. If the success signal isn't measurable + demonstrable, iterate with the user (above) before drafting.
 2. Draft the condition with the four parts above, on one logical line.
-3. Write `.longhaul/GOAL.md` (template in [../long-haul/reference/file-formats.md](../long-haul/reference/file-formats.md)): the condition, the literal `/goal …` line, the **proof line** (the exact command the loop echoes each round), and a note on why the check is transcript-demonstrable.
+3. Write `.longhaul/GOAL.md` (template in [../long-haul/reference/file-formats.md](../long-haul/reference/file-formats.md)): the condition, the literal `/goal …` line, the **proof line** (the exact command the loop echoes each round — with its exact interpreter/env per "Pin how the check is invoked"), the **acceptance gate** and its pasted-evidence form if "done" has one, and a note on why the check is transcript-demonstrable.
 4. Set `GOAL:` (one-line restatement) in `STATE.md`, advance `PHASE: haul`.
 
 ## The gate — the user runs /goal

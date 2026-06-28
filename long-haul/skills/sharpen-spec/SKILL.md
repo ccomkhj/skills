@@ -48,6 +48,27 @@ DAG's task order) — and prefer the proxy that doubles as a CI regression guard
 Note any live-MCP/container confirmation as belt-and-suspenders, but the proxy is
 what the `/goal` signal rides on.
 
+## Two checks, not one — the ratchet and the acceptance gate
+
+Most real "done"s have **two tiers**, and conflating them is the most common way
+a long-haul spec goes wrong. Separate them explicitly:
+
+- **Ratchet check** — *cheap, headless, re-runnable every round.* A unit suite, a
+  benchmark script, a lint. This is what the explore/exploit loop optimizes turn
+  after turn; it must be fast enough to run every round without thought.
+- **Acceptance gate** — *expensive / external / one-shot.* A prod job (SageMaker,
+  a deploy), an integration run against live infra, a manual sign-off. It can cost
+  hours and real money, so it **cannot** be re-run every round — it's fired **once**,
+  late, after the ratchet is green and the incumbent is locked, and its output is
+  *pasted into the transcript* where it persists for the evaluator.
+
+Pin both in the spec when they differ: which check is the per-round ratchet, and
+which (if any) is the terminal acceptance gate, what it costs, how it's run, and
+what pasted evidence proves it. If the only check is cheap and headless, say so —
+there's no gate, and the ratchet is the whole signal. If "done" *requires* the
+expensive gate, `define-goal` will structure `/goal` so the ratchet loops and the
+gate is a one-time terminal proof — but it can only do that if the spec names both.
+
 ## The toolbox — declare it in the spec
 
 A long run drifts unless its means are bounded. The spec names the **toolbox**:
@@ -62,8 +83,12 @@ If a tool isn't in the toolbox, `haul-loop` doesn't reach for it.
 ## Process
 
 Explore the target first (read the file/module, recent commits, existing tests
-or benchmarks). Then settle the sections — but match the instrument to the
-question:
+or benchmarks). **Verify any locations the source-of-truth cites** — an ADR,
+ticket, or PR that names `file.py:NNN`, a function, or a flag has almost always
+drifted; grep the current tree, confirm where the symbol actually lives, and
+record the *corrected* refs in `SPEC.md` (note the original if it helps the haul
+orient). A spec that sends the haul to a stale line number wastes its first
+round. Then settle the sections — but match the instrument to the question:
 
 - **Hard gate before the first `AskUserQuestion`.** Don't open a menu until (a) you've let the user point you at the source of truth, and (b) you've confirmed the deliverable is genuinely *enumerable*. If either is unmet, ask **one open question in plain chat** — a menu presumes the answer space it's meant to discover. And read a rejected menu as a signal: when the user clarifies or rejects your tabs, the *deliverable* isn't pinned yet — drop back to open grilling, don't reissue a reworded menu.
 - **Bounded choice → `AskUserQuestion` tabs.** Once the deliverable is known and enumerable, settle the genuinely bounded sub-decisions (which repo, which layer, the threshold, the toolbox) with the tool: **one question per call**, 2–4 concrete options as tabs grounded in your exploration (the user can pick *Other* to free-type).
@@ -71,7 +96,7 @@ question:
 Never dump the sections as a prose checklist.
 
 1. **What are we building or changing?** The specific deliverable; locate it — which **repo** (`target_repo`, which may not be cwd), then which file/module/endpoint/behavior.
-2. **What does "done" look like?** The success signal — measurable and transcript-demonstrable, with the runnable proxy if the real artifact isn't headlessly verifiable. Be stubborn here.
+2. **What does "done" look like?** The success signal — measurable and transcript-demonstrable, with the runnable proxy if the real artifact isn't headlessly verifiable. Name the **ratchet check** (cheap, every round) and the **acceptance gate** (expensive/external/once) separately when they differ. Be stubborn here.
 3. **The toolbox** — which skills + MCP the haul may use (above).
 4. **Constraints** — what must hold throughout (public API, deps, behavior other code relies on).
 5. **Out of scope** — guard against scope creep over a long run; YAGNI.

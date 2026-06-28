@@ -96,10 +96,27 @@ Written so Claude's own output demonstrates it. Example:
 ## Proof line (echoed verbatim each round, re-run at wrap-up)
 <the exact command whose output proves the condition, e.g.
 `pytest tests/pricing -q && python bench/price.py`. Must be a named command with
-transcript-visible output — a goal whose proof never lands loops forever.>
+transcript-visible output — a goal whose proof never lands loops forever. This is
+the cheap RATCHET check, re-run every round.>
+
+## Check invocation (so a green proof can't lie)
+<the exact interpreter/env the proof line runs under — e.g.
+`/opt/miniconda3/envs/dp/bin/python -m pytest …`, not bare `python` — and, if the
+haul runs in a git worktree, whether the worktree runs the worktree's code
+(editable-install trap: set `PYTHONPATH=<worktree-root>` if an editable install
+points at the main repo; "imports from tree directly, no action needed" if not).>
+
+## Acceptance gate (only if "done" has an expensive/external/one-shot tier)
+<the terminal gate from SPEC.md — what it is (prod job, deploy, sign-off), what it
+costs, how it's run, and the EXACT pasted evidence that proves it (a job-SUCCEEDED
+line, a query result). Run ONCE, late, after the ratchet is green and the incumbent
+is locked; its evidence is pasted into chat and persists for the evaluator. The
+goal holds only when BOTH the ratchet output and this evidence are in the
+transcript. Omit this section entirely if the ratchet is the whole condition.>
 
 ## Notes
-<why the check is transcript-demonstrable; any risk the evaluator misreads it>
+<why the check is transcript-demonstrable; any risk the evaluator misreads it
+(e.g. it might declare done on the ratchet alone — the condition requires both)>
 ```
 
 ---
