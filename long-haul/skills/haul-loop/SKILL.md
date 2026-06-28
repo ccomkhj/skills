@@ -67,7 +67,7 @@ governs each local code attempt — you still attempt in a throwaway worktree an
 fast-forward a measured win onto the working branch — but the *kept* incumbent is
 pushable, and the gate runs on the pushed incumbent. Decide this once, at setup,
 from `GOAL.md`'s gate; don't silently drift into committing on the working branch
-mid-haul (the live ADR-0003 run did exactly that, bypassing the whole contract).
+mid-haul.
 
 ## One round
 
@@ -96,9 +96,9 @@ tier — a prod job, a deploy, a sign-off), the per-round loop above optimizes t
 tick `ROUND` for it, and don't fold it into the same turn as the ratchet work.
 
 **Don't run it every round.** It costs hours and real money — running it each turn
-is the waste the two-tier split exists to prevent. Most rounds never touch it. Fire
-it **once**, after the ratchet is green and the incumbent is locked (the score holds
-and further rounds aren't improving it).
+is the waste the two-tier split exists to prevent. Fire it **once**, after the
+ratchet is green and the incumbent is locked (the score holds and further rounds
+aren't improving it).
 
 **Pre-register the expected result before you spend the money.** A bare "job
 SUCCEEDED" proves nothing about *correctness*. Before firing, with the toolbox's
@@ -110,15 +110,12 @@ read-only tools (e.g. the DB MCP), capture and paste:
   must NOT disappear), plus any **corner case** that could silently corrupt the
   result (e.g. bundle-only sales that might be wrongly pruned).
 Then the gate's evidence is a real *before → predicted → after* with invariants held
-— not an unfalsifiable green. This is what the live ADR-0003 run did well; make it
-the rule, not a lucky instinct.
+— not an unfalsifiable green.
 
 **Run it across turns — never block one turn for hours.** A multi-hour gate
-(CI image build → multi-job prod run → polling) must be **launched, then the turn
-ends**; subsequent `/goal` turns poll status and proceed. Submit the job
-(background or fire-and-record-the-id), print what's pending, and end the turn —
-don't churn synchronously for 15+ minutes holding the turn open. Each later turn:
-check the job, advance to the next stage or keep waiting, end the turn. Use
+(CI image build → multi-job prod run → polling) is **launched, not awaited**: submit
+the job, print what's pending, and end the turn. Each later `/goal` turn checks
+status and advances a stage — never churn synchronously holding a turn open. Use
 `ScheduleWakeup` for external state the harness can't notify you about.
 
 **Paste evidence verbatim; only then is the goal met.** When the gate completes,
