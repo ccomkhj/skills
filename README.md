@@ -27,20 +27,25 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 | [dual-report](./dual-haul/skills/dual-report) | Phase 4 — report goal-vs-achieved and who won each round (`.dualhaul/SUMMARY.md`) |
 | [dual-ship](./dual-haul/skills/dual-ship) | Phase 5 — commit on a feature branch, open a PR, tear down worktrees |
 
-### pair-* — bounded Claude ↔ Codex collaboration
+### Bounded consultation & optimization
 
 | Skill | Version | Description |
 |-------|---------|-------------|
+| [single-consult](./single-consult) | 1.0.0 | Fast in-session sibling of pair-consult: the reviewer is an **internal Claude subagent** (default `fable`), not an external Codex peer — so no shared-state/handoff machinery. Same propose · review · respond · re-review · synthesize shape. `--model sonnet\|opus\|fable`, `--depth`, `--number` |
 | [pair-consult](./pair-consult) | 1.2.0 | Bounded consultation on one question — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Round count and peer effort configurable |
 | [pair-optimize](./pair-optimize) | 1.1.0 | Optimization loop for a DuckDB/SQL query or hot Python path — A measures a baseline + proposes, B challenges, A benchmarks, B audits. Hard rule: no win kept without a measured speedup AND identical output |
 | [pair-ratchet](./pair-ratchet) | 1.0.0 | Outer loop over [pair-optimize](./pair-optimize): profile a whole hot path, optimize the dominant bottleneck then the next — each kept win ratchets the baseline — until no session yields a win (loop-until-dry) or a session cap trips |
 
-**pair-\* flags**
+**Flags**
 
 ```
-/pair-consult "<question>"                       # default: 5 rounds
-/pair-consult "<question>" --number 7            # n rounds (odd, ≥3)
-/pair-consult "<question>" --model high|xhigh    # peer reasoning effort
+/pair-consult "<question>"                        # default: 5 rounds
+/pair-consult "<question>" --number 7             # n rounds (odd, ≥3)
+/pair-consult "<question>" --model high|xhigh     # external peer effort
+
+/single-consult "<question>"                      # internal Claude reviewer, default fable
+/single-consult "<question>" --model opus         # reviewer model: sonnet|opus|fable
+/single-consult "<question>" --depth xhigh        # reviewer reasoning effort
 ```
 
 ## Plan review
