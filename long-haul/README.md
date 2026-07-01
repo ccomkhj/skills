@@ -1,7 +1,7 @@
 # long-haul
 
 A five-skill plugin that drives **one** agent relentlessly toward a verifiable
-goal over the long horizon — the solo cousin of `pair-goal`. No race; the
+goal over the long horizon — the solo cousin of `dual-haul`. No race; the
 leverage is the **explore/exploit** discipline and a **ratcheting incumbent**
 that keep a long, unattended run from drifting.
 
@@ -10,15 +10,15 @@ The arc, driven by an **auto-chaining orchestrator** (the main Claude session):
 ```
 /long-haul [a spec, or a vague idea to sharpen]
    │
-   ├─ 1. sharpen-spec   harden the ask into a spec: located deliverable,
+   ├─ 1. haul-spec   harden the ask into a spec: located deliverable,
    │                    transcript-demonstrable success signal, the *toolbox*
    │                    (allowed skills + MCP), constraints. Grill if vague.
-   ├─ 2. define-goal    forge a /goal-ready completion condition  ──▶ [GATE: you approve + run /goal]
+   ├─ 2. haul-goal    forge a /goal-ready completion condition  ──▶ [GATE: you approve + run /goal]
    ├─ 3. haul-loop      each /goal turn, one round: decide explore vs exploit,
    │                    implement in a worktree (the /implement contract),
    │                    keep only a measured win on the incumbent ratchet
    ├─ (─/goal auto-clears when the condition is met, or the round cap trips─)
-   └─ 4. wrap-up        goal vs achieved + the explore/exploit path, then a PR
+   └─ 4. haul-ship        goal vs achieved + the explore/exploit path, then a PR
                                                        ──▶ [GATE: you confirm]
 ```
 
@@ -79,8 +79,8 @@ worktree.
 
 Everything auto-advances except:
 
-1. **Approve the goal** — you read the `/goal …` line `define-goal` produces and run it yourself (slash commands are user-invoked).
-2. **Confirm the PR** — `wrap-up` shows the branch + PR body before pushing. Configurable: `GATES: confirm_pr=auto` lets an accepted unattended run open a *draft* PR without parking.
+1. **Approve the goal** — you read the `/goal …` line `haul-goal` produces and run it yourself (slash commands are user-invoked).
+2. **Confirm the PR** — `haul-ship` shows the branch + PR body before pushing. Configurable: `GATES: confirm_pr=auto` lets an accepted unattended run open a *draft* PR without parking.
 
 For an unattended run, the orchestrator's **detach-readiness** preflight checks
 the whole path is clear (Auto mode, hooks, `confirm_pr=auto`, and — for
@@ -96,8 +96,8 @@ pattern as the sibling `pair-*` skills:
 
 | File | Purpose |
 |---|---|
-| `SPEC.md` | deliverable, success signal, toolbox, constraints (from sharpen-spec) |
-| `GOAL.md` | the `/goal` condition + the literal line to run (from define-goal) |
+| `SPEC.md` | deliverable, success signal, toolbox, constraints (from haul-spec) |
+| `GOAL.md` | the `/goal` condition + the literal line to run (from haul-goal) |
 | `STATE.md` | `PHASE`, `STATUS` (incl. `GOAL-MET` → the durable loop→wrap handoff), `ROUND`/`ROUNDS`, `MODE`, `STALL`, `INCUMBENT`/`SCORE`, `REPO`, `BASE`, `GATES`, the `## Tried` list, the round log |
 | `R<N>.md` | per-round: mode + why, the attempt, the check output, the verdict |
 | `SUMMARY.md` | goal vs achieved, the explore/exploit path, net kept diff |
@@ -112,7 +112,7 @@ This is a plugin directory. To use the skills directly without a marketplace,
 symlink each skill into `~/.claude/skills`:
 
 ```bash
-for s in long-haul sharpen-spec define-goal haul-loop wrap-up; do
+for s in long-haul haul-spec haul-goal haul-loop haul-ship; do
   ln -sfn "$PWD/long-haul/skills/$s" "$HOME/.claude/skills/$s"
 done
 ```

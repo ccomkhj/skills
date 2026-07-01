@@ -1,12 +1,12 @@
 ---
-name: train-orchestrator
-description: Phase 1 of pair-goal. Improvement-focused brainstorming — assumes the user wants something existing made better, and digs for what's deficient now, what "better" means concretely, and the measurable success signal. Produces .pairgoal/UNDERSTANDING.md. Use as the first phase of a pair-goal run, or standalone when you need to sharpen a vague "make X better" into a verifiable target before setting a goal.
+name: dual-understand
+description: Phase 1 of dual-haul. Improvement-focused brainstorming — assumes the user wants something existing made better, and digs for what's deficient now, what "better" means concretely, and the measurable success signal. Produces .dualhaul/UNDERSTANDING.md. Use as the first phase of a dual-haul run, or standalone when you need to sharpen a vague "make X better" into a verifiable target before setting a goal.
 ---
 
-# train-orchestrator
+# dual-understand
 
-Phase 1 of **pair-goal**. Turns a vague "make X better" into a sharp,
-verifiable improvement target, written to `.pairgoal/UNDERSTANDING.md`.
+Phase 1 of **dual-haul**. Turns a vague "make X better" into a sharp,
+verifiable improvement target, written to `.dualhaul/UNDERSTANDING.md`.
 
 ## How this differs from plain brainstorming
 
@@ -17,7 +17,7 @@ finding the deficiency and a measurable signal, not inventing scope.
 
 ## The one thing that matters most
 
-write-goal (the next phase) needs a **transcript-demonstrable success signal** —
+dual-goal (the next phase) needs a **transcript-demonstrable success signal** —
 because `/goal`'s evaluator only reads the conversation, it can't run tools. So
 your job here is not done until you have a check whose *output Claude can show*:
 a test that exits 0, a benchmark number a script prints, a file count, a lint
@@ -38,20 +38,20 @@ possible. Cover, in order:
 6. **What's explicitly out of scope?** Guard against scope creep — YAGNI.
 
 If the request bundles several independent improvements, say so and pick one to
-pursue now; the others can be separate pair-goal runs.
+pursue now; the others can be separate dual-haul runs.
 
 ## Output
 
-Write `.pairgoal/UNDERSTANDING.md` using the template in
-[../pair-goal/reference/file-formats.md](../pair-goal/reference/file-formats.md). Then show the
+Write `.dualhaul/UNDERSTANDING.md` using the template in
+[../dual-haul/reference/file-formats.md](../dual-haul/reference/file-formats.md). Then show the
 user a 5-line recap (target · deficiency · what better means · success signal ·
-key constraint) and confirm it's right before handing to write-goal.
+key constraint) and confirm it's right before handing to dual-goal.
 
-If invoked standalone (not by the pair-goal orchestrator), end by suggesting:
-"Next: `write-goal` to turn this into a `/goal` condition."
+If invoked standalone (not by the dual-haul orchestrator), end by suggesting:
+"Next: `dual-goal` to turn this into a `/goal` condition."
 
 ## Don't
 
-- Don't propose the fix here — that's the racers' job in pair-iterate. Stay on *what* and *how we'll know*, not *how*.
-- Don't accept an unmeasurable success signal. If you can't make it transcript-demonstrable, say so explicitly in UNDERSTANDING.md so write-goal can flag it.
+- Don't propose the fix here — that's the racers' job in dual-loop. Stay on *what* and *how we'll know*, not *how*.
+- Don't accept an unmeasurable success signal. If you can't make it transcript-demonstrable, say so explicitly in UNDERSTANDING.md so dual-goal can flag it.
 - Don't over-question a clear, small ask. Two or three sharp questions can be enough.

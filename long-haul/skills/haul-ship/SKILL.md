@@ -1,9 +1,9 @@
 ---
-name: wrap-up
+name: haul-ship
 description: Phase 4 of long-haul — the finishing move. Fires once the /goal condition is met (the goal auto-clears) or the round cap trips. Reports goal-vs-achieved with the final check output, the explore/exploit path each round took, and the net kept diff; then commits the incumbent on a feature branch and opens a PR. Always confirms the branch and PR body with the user before pushing. Use as the last phase of a long-haul run.
 ---
 
-# wrap-up
+# haul-ship
 
 Phase 4 of **long-haul**. Runs when the haul ends — the goal cleared, or the
 round cap was hit. It does two things: report what happened, then ship the

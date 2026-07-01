@@ -1,6 +1,6 @@
-# `.pairgoal/` file formats
+# `.dualhaul/` file formats
 
-Every file lives under `.pairgoal/` at the repo root. Append `.pairgoal/` to
+Every file lives under `.dualhaul/` at the repo root. Append `.dualhaul/` to
 `.gitignore` on init. A cold-woken racer never reads these — it gets a
 self-contained brief — so these templates are purely for the orchestrator and
 the human.
@@ -12,7 +12,7 @@ the human.
 ```
 PHASE: <understand | goal | iterate | summarize | cleanup>
 STATUS: <ACTIVE: orchestrator | WAITING-USER: <gate> | RACING: R<n> | BLOCKED: <reason> | DONE>
-ROUND: <current pair-iterate round, 0 before iterate>
+ROUND: <current dual-loop round, 0 before iterate>
 ROUNDS: <hard round cap, default 5>
 RACER_CLAUDE: <model id for the Claude racer, e.g. claude-sonnet-4-6>
 RACER_CODEX: <model id for the Codex racer, e.g. gpt-5-codex>
@@ -25,13 +25,13 @@ BASE: <git short-sha the iteration started from>
 - R2: ...
 ```
 
-`PHASE` is what lets a re-invoked `/pair-goal` resume at the right step.
+`PHASE` is what lets a re-invoked `/dual-haul` resume at the right step.
 `STATUS: WAITING-USER: <gate>` marks one of the three human gates
 (`approve-goal`, `pick-models`, `confirm-pr`).
 
 ---
 
-## `UNDERSTANDING.md` — output of train-orchestrator
+## `UNDERSTANDING.md` — output of dual-understand
 
 ```
 # Understanding
@@ -59,7 +59,7 @@ file-count, an exit code — something Claude's own output can show, because the
 
 ---
 
-## `GOAL.md` — output of write-goal
+## `GOAL.md` — output of dual-goal
 
 ```
 # Goal
@@ -81,7 +81,7 @@ Written so Claude's own output demonstrates it. Example:
 
 ---
 
-## `R<N>.md` — one per pair-iterate round
+## `R<N>.md` — one per dual-loop round
 
 ```
 # R<N> — race
@@ -89,7 +89,7 @@ Written so Claude's own output demonstrates it. Example:
 ## Brief given to both racers
 <the improvement target + what the previous round failed at + constraints.
 This is the body that goal_race embeds into each racer's prompt; also saved
-verbatim as .pairgoal/R<N>-brief.md>
+verbatim as .dualhaul/R<N>-brief.md>
 
 ## Claude racer (model: <m>)
 - Diff: <files touched, +/- lines>
@@ -111,7 +111,7 @@ verbatim as .pairgoal/R<N>-brief.md>
 
 ---
 
-## `SUMMARY.md` — output of summarize
+## `SUMMARY.md` — output of dual-report
 
 ```
 # Summary

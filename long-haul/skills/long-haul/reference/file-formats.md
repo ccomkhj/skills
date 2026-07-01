@@ -25,7 +25,7 @@ SCORE: none            # the incumbent's measured value, e.g. "p95=41ms" or "8/1
 REPO: <abs path>       # the target repo — owns BASE, worktrees, the incumbent branch, the PR; may differ from cwd
 BASE: <short-sha>      # the commit (in REPO) the haul started from — where the incumbent branch and explore attempts fork
 GATES: approve_goal=required confirm_pr=required   # confirm_pr=auto for an accepted unattended finish (draft PR, no park)
-GOAL: pending          # one-line restatement of the /goal condition (set by define-goal)
+GOAL: pending          # one-line restatement of the /goal condition (set by haul-goal)
 
 ## Tried (explored approaches already rejected — don't re-explore)
 - R6 explore: <approach> — scored <x>, did not beat incumbent
@@ -38,12 +38,12 @@ GOAL: pending          # one-line restatement of the /goal condition (set by def
 **STATUS values:** `ACTIVE: orchestrator` (a phase is running) · `WAITING-USER:
 <gate>` (parked on a human — `approve-goal`, `confirm-pr`, or `cap-decision`) ·
 `HAULING: R<n>` (a round is in flight) · `GOAL-MET` (the condition holds; go to
-wrap-up) · `BLOCKED: <reason>` · `DONE`. `PHASE` + `STATUS` are what let a
+haul-ship) · `BLOCKED: <reason>` · `DONE`. `PHASE` + `STATUS` are what let a
 re-invoked `/long-haul` resume at the right step.
 
 ---
 
-## `SPEC.md` — output of sharpen-spec
+## `SPEC.md` — output of haul-spec
 
 ```
 # Spec
@@ -77,7 +77,7 @@ live-MCP/container confirmation as belt-and-suspenders.>
 
 ---
 
-## `GOAL.md` — output of define-goal
+## `GOAL.md` — output of haul-goal
 
 ```
 # Goal
@@ -93,7 +93,7 @@ Written so Claude's own output demonstrates it. Example:
 ## The line to run
 /goal <the condition above on one logical line>
 
-## Proof line (echoed verbatim each round, re-run at wrap-up)
+## Proof line (echoed verbatim each round, re-run at haul-ship)
 <the exact command whose output proves the condition, e.g.
 `pytest tests/pricing -q && python bench/price.py`. Must be a named command with
 transcript-visible output — a goal whose proof never lands loops forever. This is
@@ -213,7 +213,7 @@ round refuses to run while it's alive. The driver removes it on exit; a stale
 
 ---
 
-## `SUMMARY.md` — output of wrap-up
+## `SUMMARY.md` — output of haul-ship
 
 ```
 # Summary

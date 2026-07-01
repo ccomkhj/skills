@@ -86,7 +86,7 @@ mid-haul.
    - Either win → update `INCUMBENT`/`SCORE`, set `STALL: 0`.
    - **Not a win** → keep nothing (incumbent untouched). Increment `STALL`. If it was an explore, append the approach + its score to `## Tried`.
 7. **Prove it in chat.** The main tree already holds the incumbent — **re-run `GOAL.md`'s proof line there and print its output verbatim**. This is the transcript the `/goal` evaluator judges; the same command every round is what lets it decide. Note in `R<N>.md` what's still short of the goal.
-8. **Tear down + advance.** `git worktree remove .longhaul/attempt --force`, `git branch -D longhaul/attempt-r<N>`, `git worktree prune`. Bump `ROUND`; append a one-line `R<N>` entry to `STATE.md`'s round log. **Then check the proof from step 7: if the goal condition now holds, set `PHASE: wrap`, `STATUS: GOAL-MET`, and proceed to `wrap-up`** — don't rely on `/goal`'s evaluator alone to route you. **But if `GOAL.md` has an acceptance gate, the condition is *not* met on a green ratchet alone — the gate's pasted evidence must also be in the transcript (see below).** Otherwise end the turn; `/goal` decides whether to start another.
+8. **Tear down + advance.** `git worktree remove .longhaul/attempt --force`, `git branch -D longhaul/attempt-r<N>`, `git worktree prune`. Bump `ROUND`; append a one-line `R<N>` entry to `STATE.md`'s round log. **Then check the proof from step 7: if the goal condition now holds, set `PHASE: wrap`, `STATUS: GOAL-MET`, and proceed to `haul-ship`** — don't rely on `/goal`'s evaluator alone to route you. **But if `GOAL.md` has an acceptance gate, the condition is *not* met on a green ratchet alone — the gate's pasted evidence must also be in the transcript (see below).** Otherwise end the turn; `/goal` decides whether to start another.
 
 ## The acceptance gate — fire it once, late
 
@@ -191,13 +191,13 @@ foreground loop was), then **`/goal clear`** to retire the interactive loop, the
 close the terminal. The lock makes this safe — once the driver holds `bg.pid`,
 the cleared foreground loop wouldn't double-drive anyway. To come back:
 `haul_bg_stop` and resume foreground with a fresh `/goal`, or just watch with
-`haul_bg_status` until it finishes and pick up at `wrap-up`.
+`haul_bg_status` until it finishes and pick up at `haul-ship`.
 
 ## When does the haul stop
 
 You don't poll the goal — `/goal` does. It clears automatically when the
 evaluator sees the condition met in the transcript, and the next thing you do is
-`wrap-up`. But hold and surface to the user (don't burn turns) when:
+`haul-ship`. But hold and surface to the user (don't burn turns) when:
 
 - `ROUND` reaches `ROUNDS` (cap) without the goal clearing → set `STATUS: WAITING-USER: cap-decision`, report partial against the incumbent, and ask whether to raise the cap, accept, or stop. (Setting the status means a resume re-presents the question instead of running another round.)
 - **The well is dry** — you've exploited to a stall *and* a following explore failed to beat the incumbent, with no untried approach left → the goal likely can't be met as specified; `STATUS: WAITING-USER: cap-decision`, surface rather than grind.
@@ -242,7 +242,7 @@ If re-invoked while `STATUS: HAULING: R<n>`: inspect `.longhaul/attempt/`. If th
 worktree exists with commits, the attempt is in flight — continue implementing
 or, if the check already ran, judge it (step 6). Don't spin a second worktree for
 the same round. If `STATUS: GOAL-MET` or `cap-decision`, the loop is over — go to
-`wrap-up`, don't start a round.
+`haul-ship`, don't start a round.
 
 If invoked standalone (not by the orchestrator), once the goal clears end by
-suggesting: "Next: `wrap-up` to report and open a PR."
+suggesting: "Next: `haul-ship` to report and open a PR."

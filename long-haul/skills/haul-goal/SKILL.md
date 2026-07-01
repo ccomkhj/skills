@@ -1,9 +1,9 @@
 ---
-name: define-goal
-description: Phase 2 of long-haul. Turn .longhaul/SPEC.md into a /goal-ready completion condition — one measurable end state, a stated transcript-demonstrable check, the constraints that must hold, and a round cap — written to .longhaul/GOAL.md plus the literal /goal line for the user to run. If the end state isn't clear or measurable, iterate with the user one question at a time until it is. Use after sharpen-spec, or standalone to craft a good /goal condition from a clear spec.
+name: haul-goal
+description: Phase 2 of long-haul. Turn .longhaul/SPEC.md into a /goal-ready completion condition — one measurable end state, a stated transcript-demonstrable check, the constraints that must hold, and a round cap — written to .longhaul/GOAL.md plus the literal /goal line for the user to run. If the end state isn't clear or measurable, iterate with the user one question at a time until it is. Use after haul-spec, or standalone to craft a good /goal condition from a clear spec.
 ---
 
-# define-goal
+# haul-goal
 
 Phase 2 of **long-haul**. Converts `.longhaul/SPEC.md` into a completion
 condition you can hand to Claude Code's `/goal`, written to `.longhaul/GOAL.md`.
@@ -30,7 +30,7 @@ whose output appears in the transcript** — not "the tests pass" but `pytest
 tests/x -q` with its exit line shown. **Reject any success signal that isn't**: if
 proving it needs a tool run, *running it and surfacing the output* is part of the
 loop's job. Emit a copy-pasteable **proof line** — the exact command — that
-`haul-loop` echoes verbatim each round and `wrap-up` re-runs at the end. A goal
+`haul-loop` echoes verbatim each round and `haul-ship` re-runs at the end. A goal
 whose proof never lands loops forever.
 
 When the real artifact isn't locally runnable, the proof line rides on the
@@ -103,7 +103,7 @@ Set `STATUS: WAITING-USER: approve-goal`. Wait for the user to approve (and
 possibly edit) and to actually run `/goal`. Only then does the haul begin.
 
 If invoked standalone (not by the orchestrator), note that once `/goal` is
-active, `haul-loop` takes each turn until the goal clears, then `wrap-up` ships.
+active, `haul-loop` takes each turn until the goal clears, then `haul-ship` ships.
 
 ## Don't
 

@@ -1,13 +1,13 @@
 ---
-name: write-goal
-description: Phase 2 of pair-goal. Turns .pairgoal/UNDERSTANDING.md into a /goal-ready completion condition — one measurable end state, a stated transcript-demonstrable check, the constraints that must hold, and a turn cap — written to .pairgoal/GOAL.md plus the literal /goal line for the user to run. Use after train-orchestrator, or standalone to craft a good /goal condition from a clear improvement target.
+name: dual-goal
+description: Phase 2 of dual-haul. Turns .dualhaul/UNDERSTANDING.md into a /goal-ready completion condition — one measurable end state, a stated transcript-demonstrable check, the constraints that must hold, and a turn cap — written to .dualhaul/GOAL.md plus the literal /goal line for the user to run. Use after dual-understand, or standalone to craft a good /goal condition from a clear improvement target.
 ---
 
-# write-goal
+# dual-goal
 
-Phase 2 of **pair-goal**. Converts `.pairgoal/UNDERSTANDING.md` into a
+Phase 2 of **dual-haul**. Converts `.dualhaul/UNDERSTANDING.md` into a
 completion condition you can hand to Claude Code's `/goal` command, written to
-`.pairgoal/GOAL.md`.
+`.dualhaul/GOAL.md`.
 
 ## What makes a good /goal condition
 
@@ -27,9 +27,9 @@ otherwise loop forever, since the evaluator can never see the proof).
 
 ## Process
 
-1. Read `.pairgoal/UNDERSTANDING.md`. If the success signal is missing or unmeasurable, go back to the user (or train-orchestrator) — don't paper over it.
+1. Read `.dualhaul/UNDERSTANDING.md`. If the success signal is missing or unmeasurable, go back to the user (or dual-understand) — don't paper over it.
 2. Draft the condition with the four parts above, on one logical line.
-3. Write `.pairgoal/GOAL.md` (template in [../pair-goal/reference/file-formats.md](../pair-goal/reference/file-formats.md)): the condition, the literal `/goal …` line, and a note on why the check is transcript-demonstrable.
+3. Write `.dualhaul/GOAL.md` (template in [../dual-haul/reference/file-formats.md](../dual-haul/reference/file-formats.md)): the condition, the literal `/goal …` line, and a note on why the check is transcript-demonstrable.
 4. Set `GOAL:` (one-line restatement) in `STATE.md`, advance `PHASE: goal`.
 
 ## The gate — the user runs /goal
@@ -40,11 +40,11 @@ You cannot execute a slash command yourself. So present the line and hand off:
 >
 > `/goal <condition>`
 >
-> Once it's active, each turn I'll run one pair-iterate race round until the
-> condition holds, then summarize.
+> Once it's active, each turn I'll run one dual-loop race round until the
+> condition holds, then `dual-report`.
 
 Set `STATUS: WAITING-USER: approve-goal`. Wait for the user to approve (and
-possibly edit) and to actually run `/goal`. Only then does pair-iterate begin.
+possibly edit) and to actually run `/goal`. Only then does dual-loop begin.
 
 ## Don't
 

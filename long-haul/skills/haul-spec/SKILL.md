@@ -1,9 +1,9 @@
 ---
-name: sharpen-spec
+name: haul-spec
 description: Phase 1 of long-haul. Turn the user's ask into a well-defined spec — a located deliverable, a transcript-demonstrable success signal, the toolbox of skills + MCP the haul may use, constraints, and out-of-scope. If the ask is vague, grill it first. Produces .longhaul/SPEC.md. Use as the first phase of a long-haul run, or standalone to harden a fuzzy ask into something buildable before setting a goal.
 ---
 
-# sharpen-spec
+# haul-spec
 
 Phase 1 of **long-haul**. The haul will run for many turns; it can only run
 *straight* if it starts from a sharp spec. Your job is to produce
@@ -33,7 +33,7 @@ space.
 
 ## The one thing that matters most
 
-`define-goal` (the next phase) needs a **transcript-demonstrable success
+`haul-goal` (the next phase) needs a **transcript-demonstrable success
 signal** — because `/goal`'s evaluator only reads the conversation, it can't run
 tools. So you are not done until you have a check whose *output Claude can show*:
 a test that exits 0, a benchmark number a script prints, a file count, a lint
@@ -66,7 +66,7 @@ Pin both in the spec when they differ: which check is the per-round ratchet, and
 which (if any) is the terminal acceptance gate, what it costs, how it's run, and
 what pasted evidence proves it. If the only check is cheap and headless, say so —
 there's no gate, and the ratchet is the whole signal. If "done" *requires* the
-expensive gate, `define-goal` will structure `/goal` so the ratchet loops and the
+expensive gate, `haul-goal` will structure `/goal` so the ratchet loops and the
 gate is a one-time terminal proof — but it can only do that if the spec names both.
 
 ## The toolbox — declare it in the spec
@@ -112,10 +112,10 @@ Show the user a 5-line recap (deliverable · success signal · toolbox · key
 constraint · out-of-scope) and confirm it's right. Advance `PHASE: goal`.
 
 If invoked standalone (not by the orchestrator), end by suggesting:
-"Next: `define-goal` to turn this into a `/goal` condition."
+"Next: `haul-goal` to turn this into a `/goal` condition."
 
 ## Don't
 
 - Don't prescribe the implementation here — *how* is the haul's job. Stay on *what* and *how we'll know*.
-- Don't accept an unmeasurable success signal. If you can't make it transcript-demonstrable, say so explicitly in SPEC.md so define-goal can flag it.
+- Don't accept an unmeasurable success signal. If you can't make it transcript-demonstrable, say so explicitly in SPEC.md so haul-goal can flag it.
 - Don't leave the toolbox open-ended ("any tool") — an unbounded long run is exactly the drift the toolbox bounds.

@@ -107,7 +107,7 @@ output: <one-line assessment of what this round produced and whether the check m
 error message: <the failing check output or error this round, or "none">
 next decision: <explore|exploit> (<why, citing the stall counter or a structural reason>) -> <the concrete change planned for next round>
 
-Do exactly one round, then stop. Never start a second round. Do NOT run wrap-up, open a PR, push, or set GOAL-MET — the driver owns termination and a human confirms the PR later. Just do the round, update STATE.md/PROGRESS.log, and exit.
+Do exactly one round, then stop. Never start a second round. Do NOT run haul-ship, open a PR, push, or set GOAL-MET — the driver owns termination and a human confirms the PR later. Just do the round, update STATE.md/PROGRESS.log, and exit.
 EOF
 }
 
@@ -135,7 +135,7 @@ __haul_bg_driver() {
     if bash "$LONGHAUL_DIR/check.sh"; then
       echo "=== driver: goal check PASSED after round $n — stopping ==="
       printf '\n[Done] goal met after Loop%s @ %s\n' "$n" "$(date '+%F %T')" >> "$LONGHAUL_DIR/PROGRESS.log"
-      # Durable handoff: a resuming /long-haul sees GOAL-MET and runs wrap-up.
+      # Durable handoff: a resuming /long-haul sees GOAL-MET and runs haul-ship.
       _haul_set PHASE wrap; _haul_set STATUS GOAL-MET
       rm -f "$LONGHAUL_DIR/bg.pid"; return 0
     fi

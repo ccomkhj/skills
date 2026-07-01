@@ -1,5 +1,5 @@
 {
-  "name": "pair-goal",
+  "name": "dual-haul",
   "description": "Goal-driven improvement loop: understand what needs improving, forge a /goal completion condition, then race a different-model Claude against Codex (each in its own git worktree) round by round until the goal is met, summarize, and ship a PR.",
   "version": "1.0.0",
   "author": {
@@ -11,7 +11,8 @@
     "goal",
     "iteration",
     "codex",
-    "pair",
+    "dual",
+    "race",
     "worktree",
     "orchestration",
     "improvement"
