@@ -224,9 +224,34 @@ for r in ("a", "b", "c"):
 
 ---
 
+## Docstrings — say what the code can't
+
+**Rule:** A docstring earns its place only by carrying what the reader *can't* get from the signature and body: the contract (what it guarantees, units, valid ranges), the *why*, non-obvious side effects, and which exceptions fire when. Shape (PEP 257):
+- Summary line in the **imperative** ("Return the parsed order", not "This function returns…" / "Returns…"), fits on one line, `"""triple double quotes"""`.
+- Multi-line: summary, blank line, then elaboration; closing `"""` on its own line. One-liner for obvious cases — closing quotes on the same line.
+- Document argument *names* if you document args at all; never restate types (they live in annotations).
+
+```python
+# no-op — parrots the signature
+def add(x: int, y: int) -> int:
+    """Takes x and y and returns their sum."""
+    return x + y
+
+# informative — states the contract the code doesn't show
+def price(order: Order) -> float:
+    """Return the discounted total; 0.0 for an empty or missing order.
+
+    Raises ValueError if any item cost is negative.
+    """
+```
+
+**Anti-rule:** Simplifying is not documenting — don't **fabricate** docstrings for code that has none as part of a tidy pass unless asked; that's scope creep, and a wrong docstring is worse than none. Trim an existing docstring to only the non-obvious; delete one that merely narrates the code. Note that editing a docstring changes the observable `__doc__` and can break `doctest`s — so treat a doctest-bearing docstring as behavior, not prose.
+
+---
+
 ## How to apply (agent loop)
 
-1. Read the recently-changed region. Identify candidate sites — idiom transforms and structural rules.
+1. Read the recently-changed region. Identify candidate sites — idiom transforms, structural rules, and docstrings that parrot the code.
 2. For each candidate, check its **anti-rule** / cited trap first. If it fires, skip and move on.
 3. Make one small edit per tidying; keep them separable.
 4. Run tests / type-check / lint if available; results must be no worse than the pre-edit baseline. Green tests are necessary but **not sufficient** — they rarely cover the empty/`None`/falsy/exception edges where these rewrites break. So also state, in one sentence, why each hunk is behavior-identical; if a hunk touches a trap in python-gotchas.md and you can't make that one-sentence argument, revert it.
