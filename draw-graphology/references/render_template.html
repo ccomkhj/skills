@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body { background: #0a0a0a; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    #graph { width: 100vw; height: 100vh; }
+    #title {
+      position: fixed; top: 18px; left: 22px; z-index: 10;
+      color: #f5f0eb; font-size: 20px; font-weight: 600; letter-spacing: 0.2px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    #subtitle {
+      position: fixed; top: 46px; left: 22px; z-index: 10;
+      color: #a39787; font-size: 13px; max-width: 60vw;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    #legend {
+      position: fixed; bottom: 18px; left: 22px; z-index: 10;
+      background: rgba(20,20,20,0.82); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 10px 12px; color: #d8d0c6; font-size: 12px;
+      max-height: 40vh; overflow: auto;
+    }
+    #legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+    #legend .dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; }
+    #legend .head { font-weight: 600; color: #f5f0eb; margin-bottom: 6px; }
+    #tour {
+      position: fixed; bottom: 18px; right: 22px; z-index: 10; display: none;
+      background: rgba(20,20,20,0.9); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 14px 16px; color: #e8e2d8; max-width: 340px;
+    }
+    #tour .tstep { color: #a39787; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 5px; }
+    #tour .ttitle { color: #f5f0eb; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    #tour .tdesc { color: #c9c0b6; font-size: 13px; line-height: 1.45; }
+    #tourhint {
+      position: fixed; top: 18px; right: 22px; z-index: 10; display: none;
+      color: #8a8078; font-size: 12px; background: rgba(20,20,20,0.7);
+      border-radius: 6px; padding: 6px 10px; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body>
+  <div id="title"></div>
+  <div id="subtitle"></div>
+  <div id="graph"></div>
+  <div id="legend" style="display:none"></div>
+  <div id="tour"></div>
+  <div id="tourhint">← → step through · Esc overview</div>
+
+  <script type="module">
+    // Pinned versions verified to render headless. Bump deliberately.
+    const Graph        = (await import("https://esm.sh/graphology@0.25.4")).default;
+    const Sigma        = (await import("https://esm.sh/sigma@3.0.1")).default;
+    const forceAtlas2  = (await import("https://esm.sh/graphology-layout-forceatlas2@0.10.1")).default;
+    const louvain      = (await import("https://esm.sh/graphology-communities-louvain@2.0.2")).default;
+    const layout       =  await import("https://esm.sh/graphology-layout@0.6.1");
+    const circular     = layout.circular;
+
+    // Default node-type palette, lifted from the Understand-Anything
+    // dashboard's semantic scheme. Override per-graph via viz.palette.
+    const TYPE_PALETTE = {
+      file: "#4a7c9b", function: "#5a9e6f", class: "#8b6fb0", module: "#c9a06c",
+      concept: "#b07a8a", config: "#5eead4", document: "#7dd3fc", service: "#a78bfa",
+      table: "#6ee7b7", endpoint: "#fdba74", pipeline: "#fda4af", schema: "#fcd34d",
+      resource: "#a5b4fc",
+    };
+    // Categorical palette for community coloring (distinct hues).
+    const COMMUNITY_PALETTE = [
+      "#5ba4cf", "#5ea67a", "#cf7a8a", "#9b7abf", "#c9963a",
+      "#4aab9a", "#e0708a", "#7dd3fc", "#a5b4fc", "#fcd34d",
+      "#f0967a", "#68c4b4", "#b494d4", "#9ec96e", "#dd8fb0",
+    ];
+    const DEFAULT_COLOR = "#7a8290";
+
+    function pickColor(node, mode, palette, communityOf) {
+      if (node.color) return node.color;                 // explicit wins
+      if (mode === "community") {
+        const c = communityOf.get(node.id) ?? 0;
+        return COMMUNITY_PALETTE[c % COMMUNITY_PALETTE.length];
+      }
+      if (mode === "type" && node.type) {
+        return palette[node.type] ?? DEFAULT_COLOR;
+      }
+      return DEFAULT_COLOR;
+    }
+
+    function renderGraph(raw) {
+      const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const viz = data.viz || {};
+      const meta = data.meta || {};
+      const directed = viz.directed !== false;            // default directed
+      const palette = { ...TYPE_PALETTE, ...(viz.palette || {}) };
+
+      document.body.style.background = viz.background || "#0a0a0a";
+      document.getElementById("title").textContent = meta.title || "";
+      document.getElementById("subtitle").textContent = meta.description || "";
+
+      const g = new Graph({ type: directed ? "directed" : "undirected", multi: true });
+
+      for (const n of data.nodes) {
+        if (g.hasNode(n.id)) continue;
+        g.addNode(n.id, { label: n.label ?? n.id, _type: n.type, _value: n.value, x: n.x, y: n.y });
+      }
+      for (const e of data.edges) {
+        if (!g.hasNode(e.source) || !g.hasNode(e.target)) continue;
+        g.addEdge(e.source, e.target, {
+          _weight: typeof e.weight === "number" ? e.weight : 1,
+          _type: e.type,
+          label: e.label,
+        });
+      }
+
+      // --- Analysis: community detection (graphology-communities-louvain) ---
+      // Louvain needs a simple undirected graph. Build one explicitly rather
+      // than copying `g` (graphology copy() can't flip directed→undirected),
+      // mirroring the Understand-Anything dashboard's detectCommunities().
+      const communityOf = new Map();
+      if ((viz.colorBy || "type") === "community" || viz.detectCommunities) {
+        try {
+          const u = new Graph({ type: "undirected", multi: false });
+          for (const id of g.nodes()) u.addNode(id);
+          for (const e of g.edges()) {
+            const s = g.source(e), t = g.target(e);
+            if (s !== t && !u.hasEdge(s, t)) u.addEdge(s, t);
+          }
+          const res = louvain(u);
+          // Compact community ids to 0..k-1 so the palette indexes cleanly.
+          const remap = new Map();
+          for (const id of u.nodes()) {
+            const c = res[id] ?? 0;
+            if (!remap.has(c)) remap.set(c, remap.size);
+            communityOf.set(id, remap.get(c));
+          }
+        } catch (_) { /* leave empty; falls back to community 0 */ }
+      }
+
+      // --- Sizing (degree centrality by default, like the dashboard) ---
+      const sizeBy = viz.sizeBy || "degree";
+      const minSize = viz.minSize ?? 4;
+      const maxSize = viz.maxSize ?? 22;
+      let sMax = 1;
+      const rawSize = new Map();
+      for (const id of g.nodes()) {
+        let s;
+        if (sizeBy === "fixed") s = g.getNodeAttribute(id, "_value") ?? 1;
+        else if (sizeBy === "value") s = g.getNodeAttribute(id, "_value") ?? 1;
+        else s = g.degree(id);                            // "degree"
+        s = Math.max(0, s);
+        rawSize.set(id, s);
+        if (s > sMax) sMax = s;
+      }
+      for (const id of g.nodes()) {
+        const t = Math.sqrt(rawSize.get(id) / sMax);      // sqrt → area-ish scaling
+        g.setNodeAttribute(id, "size", minSize + t * (maxSize - minSize));
+      }
+
+      // --- Coloring ---
+      const colorBy = viz.colorBy || "type";
+      for (const id of g.nodes()) {
+        const node = { id, color: undefined, type: g.getNodeAttribute(id, "_type") };
+        g.setNodeAttribute(id, "color", pickColor(node, colorBy, palette, communityOf));
+      }
+
+      // --- Edge width by weight, plus arrow heads for directed graphs ---
+      for (const e of g.edges()) {
+        const w = g.getEdgeAttribute(e, "_weight");
+        g.setEdgeAttribute(e, "size", 0.5 + Math.max(0, Math.min(1, w)) * 3.5);
+        g.setEdgeAttribute(e, "color", viz.edgeColor || "rgba(255,255,255,0.28)");
+        if (directed) g.setEdgeAttribute(e, "type", "arrow");
+      }
+
+      // --- Layout ---
+      const mode = viz.layout || "forceatlas2";
+      const hasPreset = data.nodes.every((n) => typeof n.x === "number" && typeof n.y === "number");
+      if (mode === "preset" && hasPreset) {
+        // positions already set from node.x / node.y
+      } else if (mode === "circular") {
+        circular.assign(g);
+      } else if (mode === "random") {
+        for (const id of g.nodes()) {
+          // deterministic pseudo-scatter (no Math.random for reproducible renders)
+          const h = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+          g.setNodeAttribute(id, "x", ((h % 1000) / 1000) * 10 - 5);
+          g.setNodeAttribute(id, "y", (((h >> 10) % 1000) / 1000) * 10 - 5);
+        }
+      } else {
+        // forceatlas2 — seed with circular so FA2 has non-degenerate start
+        circular.assign(g);
+        const iterations = viz.iterations ?? 300;
+        const settings = forceAtlas2.inferSettings(g);
+        settings.scalingRatio = viz.scalingRatio ?? 12;
+        settings.gravity = viz.gravity ?? 1;
+        forceAtlas2.assign(g, { iterations, settings });
+      }
+
+      // --- Legend ---
+      buildLegend(g, colorBy, palette, communityOf);
+
+      // --- Render ---
+      const container = document.getElementById("graph");
+      container.innerHTML = "";
+      const labelThreshold = viz.labelThreshold ?? 0;
+      const renderer = new Sigma(g, container, {
+        renderEdgeLabels: !!viz.edgeLabels,
+        defaultEdgeType: directed ? "arrow" : "line",
+        labelColor: { color: viz.labelColor || "#e8e2d8" },
+        labelSize: viz.labelSize ?? 12,
+        labelRenderedSizeThreshold: labelThreshold,
+        minCameraRatio: 0.05,
+        maxCameraRatio: 20,
+      });
+      renderer.refresh();
+
+      // --- Guided tour (arrow keys), à la Understand-Anything tours ---
+      TOUR.renderer = renderer;
+      TOUR.g = g;
+      TOUR.index = -1;
+      TOUR.home = { ...renderer.getCamera().getState() };
+      TOUR.steps = viz.tour === false ? [] : buildTourSteps(g, data.tour);
+      document.getElementById("tourhint").style.display = TOUR.steps.length ? "block" : "none";
+
+      return { success: true, nodes: g.order, edges: g.size };
+    }
+
+    function buildLegend(g, colorBy, palette, communityOf) {
+      const el = document.getElementById("legend");
+      const entries = new Map();
+      if (colorBy === "type") {
+        for (const id of g.nodes()) {
+          const t = g.getNodeAttribute(id, "_type");
+          if (t) entries.set(t, palette[t] ?? DEFAULT_COLOR);
+        }
+      } else if (colorBy === "community") {
+        for (const c of new Set(communityOf.values())) {
+          entries.set(`Cluster ${c + 1}`, COMMUNITY_PALETTE[c % COMMUNITY_PALETTE.length]);
+        }
+      }
+      if (entries.size === 0 || entries.size > 24) { el.style.display = "none"; return; }
+      const rows = [...entries.entries()]
+        .map(([k, v]) => `<div class="row"><span class="dot" style="background:${v}"></span>${k}</div>`)
+        .join("");
+      el.innerHTML = `<div class="head">${colorBy === "type" ? "Node type" : "Community"}</div>${rows}`;
+      el.style.display = "block";
+    }
+
+    // --- Tour state + navigation (shared across renders) ---
+    const TOUR = { renderer: null, g: null, steps: [], index: -1, home: null };
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    }
+
+    function buildTourSteps(g, tour) {
+      if (Array.isArray(tour) && tour.length) {
+        return tour
+          .map((s) => ({
+            title: s.title || "",
+            description: s.description || "",
+            nodes: (s.nodes || []).filter((id) => g.hasNode(id)),
+          }))
+          .filter((s) => s.nodes.length);
+      }
+      // Auto-tour: one step per node, biggest (most connected) first.
+      return g
+        .nodes()
+        .slice()
+        .sort((a, b) => g.getNodeAttribute(b, "size") - g.getNodeAttribute(a, "size"))
+        .map((id) => ({ title: g.getNodeAttribute(id, "label") || id, description: "", nodes: [id] }));
+    }
+
+    function applyTourStep() {
+      const { renderer: r, g, steps, index } = TOUR;
+      if (!r) return;
+      const panel = document.getElementById("tour");
+      if (index < 0 || !steps.length) {
+        r.setSetting("nodeReducer", null);
+        r.setSetting("edgeReducer", null);
+        panel.style.display = "none";
+        if (TOUR.home) r.getCamera().animate(TOUR.home, { duration: 500 });
+        r.refresh();
+        return;
+      }
+      const step = steps[index];
+      const focus = new Set(step.nodes);
+      const lit = new Set(step.nodes);
+      for (const id of step.nodes) g.forEachNeighbor(id, (nb) => lit.add(nb));
+
+      // Read the camera target BEFORE mutating settings: setSetting invalidates
+      // sigma's framed-coordinate cache, so a getNodeDisplayData() call after it
+      // returns raw layout coords and sends the camera into empty space.
+      // Fit the bounding box of the step's nodes so multi-node steps frame all
+      // of them, not just the centroid.
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const id of step.nodes) {
+        const dd = r.getNodeDisplayData(id);
+        minX = Math.min(minX, dd.x); maxX = Math.max(maxX, dd.x);
+        minY = Math.min(minY, dd.y); maxY = Math.max(maxY, dd.y);
+      }
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      const span = Math.max(maxX - minX, maxY - minY);
+      // span/0.55 ≈ fill ~55% of the view; single/adjacent nodes get a fixed zoom.
+      const ratio = span < 0.03 ? 0.4 : Math.min(1.1, Math.max(0.3, span / 0.55));
+
+      r.setSetting("nodeReducer", (node, d) => {
+        if (focus.has(node)) return { ...d, size: d.size * 1.3, zIndex: 2 };
+        if (lit.has(node)) return { ...d, zIndex: 1 };
+        return { ...d, color: "rgba(130,130,140,0.15)", label: null, zIndex: 0 };
+      });
+      r.setSetting("edgeReducer", (edge, d) => {
+        const s = g.source(edge), t = g.target(edge);
+        if (focus.has(s) || focus.has(t)) return { ...d, zIndex: 1 };
+        return { ...d, color: "rgba(255,255,255,0.05)", zIndex: 0 };
+      });
+      r.getCamera().animate({ x: cx, y: cy, ratio }, { duration: 600 });
+      panel.innerHTML =
+        `<div class="tstep">Step ${index + 1} / ${steps.length}</div>` +
+        `<div class="ttitle">${escapeHtml(step.title)}</div>` +
+        (step.description ? `<div class="tdesc">${escapeHtml(step.description)}</div>` : "");
+      panel.style.display = "block";
+      r.refresh();
+    }
+
+    window.addEventListener("keydown", (ev) => {
+      if (!TOUR.steps.length) return;
+      if (ev.key === "ArrowRight") {
+        TOUR.index = Math.min(TOUR.steps.length - 1, TOUR.index + 1);
+        applyTourStep(); ev.preventDefault();
+      } else if (ev.key === "ArrowLeft") {
+        TOUR.index = Math.max(-1, TOUR.index - 1);
+        applyTourStep(); ev.preventDefault();
+      } else if (ev.key === "Escape") {
+        TOUR.index = -1;
+        applyTourStep(); ev.preventDefault();
+      }
+    });
+
+    // Expose for the Playwright renderer, and auto-render inlined data
+    // (the self-contained deliverable sets window.__GRAPH_DATA).
+    window.renderGraph = (d) => {
+      try { const r = renderGraph(d); window.__renderComplete = true; return r; }
+      catch (e) { window.__renderComplete = true; return { success: false, error: String(e) }; }
+    };
+    window.__moduleReady = true;
+    if (window.__GRAPH_DATA) {
+      window.renderGraph(window.__GRAPH_DATA);
+      // give Sigma two frames to paint before signalling done
+      requestAnimationFrame(() => requestAnimationFrame(() => { window.__renderComplete = true; }));
+    }
+  </script>
+</body>
+</html>
