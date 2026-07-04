@@ -87,7 +87,8 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 
 | Skill | Version | Description | Source |
 |-------|---------|-------------|--------|
-| [excalidraw-diagram](./excalidraw-diagram) | 1.0.0 | Create Excalidraw diagram JSON files that make visual arguments | Improved from [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
+| [draw-graphology](./draw-graphology) | 1.1.0 | Data-driven network graph visualizations (interactive HTML + static PNG) with [graphology](https://graphology.github.io/) + [sigma.js](https://www.sigmajs.org/) — ForceAtlas2 layout, Louvain community colors, degree-sized hubs, and a Playwright screenshot loop so the agent validates its own render. For node-edge datasets too large to place by hand | Methodology ported from the Understand-Anything dashboard |
+| [excalidraw-diagram](./excalidraw-diagram) | 1.0.0 | Create Excalidraw diagram JSON files that make visual arguments — hand-placed conceptual diagrams, vs [draw-graphology](./draw-graphology)'s computed layouts | Improved from [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 | [loom-transcript](./loom-transcript) | 1.0.0 | Fetch a public Loom video's transcript from its share link (oEmbed + share-page scrape, stdlib Python, no auth) and summarize it. User-invoked: `/loom-transcript <url>` | — |
 
 ## Install
