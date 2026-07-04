@@ -48,6 +48,19 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 /single-consult "<question>" --depth xhigh        # reviewer reasoning effort
 ```
 
+### Unattended cleanup
+
+| Skill | Version | Description |
+|-------|---------|-------------|
+| [lunch-clean-loop](./lunch-clean-loop) | 1.0.0 | Kick it off, go eat lunch: scans the codebase for readability debt, then loops up to N targets (default 5) through a fresh cleaner → reviewer → tester trio — a cleanup is kept only if an independent reviewer approves it AND a tester demonstrates identical output, else it's reverted. One `refactor:` commit per kept target on a `clean-loop/<date>` branch in its own worktree; the user's checkout is never touched. Python cleaners apply the [simplify-python](./simplify-python) ruleset |
+
+**Usage**
+
+```
+/lunch-clean-loop                     # whole repo, N=5
+/lunch-clean-loop src/pipeline --n 2  # scoped, 2 iterations
+```
+
 ## Plan review
 
 | Skill | Version | Description | Source |
