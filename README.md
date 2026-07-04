@@ -68,13 +68,6 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 | [review-markdown-plan](./review-markdown-plan) | 1.0.0 | **Deprecated** (use pair-\*). Review a markdown plan by section, annotating only concretely wrong steps | — |
 | [get-feedback-markdown-plan](./get-feedback-markdown-plan) | 1.0.0 | **Deprecated** (use pair-\*). Evaluate the inline feedback [review-markdown-plan](./review-markdown-plan) left, verifying each critique against the codebase | — |
 
-## LLM knowledge base
-
-| Skill | Version | Description | Source |
-|-------|---------|-------------|--------|
-| [simple-llm-wiki](./simple-llm-wiki) | 1.0.0 | Build and maintain a personal LLM-powered knowledge base (Ingest / Query / Lint) over a `raw/` + `wiki/` directory pair | Adapted from [astro-han/karpathy-llm-wiki](https://github.com/astro-han/karpathy-llm-wiki) |
-| [grill-with-llm-wiki](./grill-with-llm-wiki) | 1.0.0 | Read-only companion to [simple-llm-wiki](./simple-llm-wiki): stress-test a plan against an existing wiki (articles, index, log, raw sources) | — |
-
 ## Skill & MCP hygiene
 
 | Skill | Version | Description | Source |
@@ -94,7 +87,6 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 
 | Skill | Version | Description | Source |
 |-------|---------|-------------|--------|
-| [analyze-git-style](./analyze-git-style) | 1.0.0 | Analyze git commit history across all repos, score message quality, and generate a teaching-focused CLI report | — |
 | [excalidraw-diagram](./excalidraw-diagram) | 1.0.0 | Create Excalidraw diagram JSON files that make visual arguments | Improved from [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 | [loom-transcript](./loom-transcript) | 1.0.0 | Fetch a public Loom video's transcript from its share link (oEmbed + share-page scrape, stdlib Python, no auth) and summarize it. User-invoked: `/loom-transcript <url>` | — |
 
