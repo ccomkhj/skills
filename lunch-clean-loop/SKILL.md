@@ -1,17 +1,17 @@
 ---
 name: lunch-clean-loop
-description: Use when the user wants the codebase scanned for readability debt and cleaned up unattended — "clean up the codebase", "run a cleanup loop", "lunch clean", "tidy the repo while I'm out". Runs up to N iterations (default 5), one cleanup target per iteration, each driven by a fresh cleaner/reviewer/tester subagent trio; a cleanup is kept only if an independent reviewer approves the readability win AND a tester demonstrates identical output — otherwise it is reverted. Works in a git worktree on a clean-loop/<date> branch; the user's checkout is never touched, nothing is pushed. Behavior-preserving, module-local cleanups only — not a performance tool (use pair-ratchet) and not for polishing code just written (use simplify / simplify-python directly).
+description: Unattended cleanup loop — scan the codebase for readability debt and run up to N targets (default 5) through a cleaner/reviewer/tester trio; verified cleanups land as per-target refactor commits on a clean-loop/<date> branch. Not a performance tool (pair-ratchet) and not for polishing just-written code (simplify-python).
 argument-hint: "[path|glob] [--n <count>]"
+disable-model-invocation: true
 ---
 
 # lunch-clean-loop
 
 ## What this is
 
-Kick it off, go eat lunch, come back to a branch of verified cleanups. The
-skill scans the codebase for readability debt, then loops: pick the most
-valuable target, clean it, gate it, commit it — or revert it. Every accepted
-cleanup is one commit on `clean-loop/<date>` in its own worktree, so each is
+Scan the codebase for readability debt, then loop: pick the most valuable
+target, clean it, gate it, commit it — or revert it. Every accepted cleanup
+is one commit on `clean-loop/<date>` in its own worktree, so each is
 independently revertible and the checkout you left behind (dirty or not) is
 never touched.
 
@@ -36,9 +36,9 @@ judgment.
 3. **Kept only if verified.** Reviewer approval + demonstrated output
    equivalence, or full revert. Never commit on static reasoning alone.
 4. **The user's checkout is sacred.** All edits, test runs, and commits happen
-   in the worktree. No pushes, no PRs, no merges — a human does those. Never
-   edit the user's files, including `.gitignore` (repo-local ignores go in
-   `.git/info/exclude`).
+   in the worktree; if the worktree goes missing mid-run, stop — never fall
+   back to the real checkout. No pushes, no PRs, no merges — a human does
+   those. Never edit the user's files, `.gitignore` included.
 5. **Skip what you can't execute.** A target whose behavior can't be exercised
    by tests is skipped, not cleaned on faith.
 
@@ -51,11 +51,8 @@ manages git and the loop. Per iteration it spawns three **fresh** subagents
 | Role | Access | Sees | Returns |
 |---|---|---|---|
 | **cleaner** | edit tools, worktree cwd | target file(s) + the brief, which names the ruleset to load | list of tidyings applied |
-| **reviewer** | read-only | the `git diff` + rubric — **never** the cleaner's reasoning | ACCEPT / REJECT + reasons |
+| **reviewer** | read-only | the `git diff` + rubric, **cold** — never the cleaner's reasoning | ACCEPT / REJECT + reasons |
 | **tester** | run tools, worktree cwd + scratchpad | target, diff, covering tests (if any) | PASS / FAIL / UNEXERCISABLE + evidence |
-
-The reviewer's independence is the point: it judges the diff cold, so it
-can't be anchored by the cleaner's self-justification.
 
 ## Init — `/lunch-clean-loop [path|glob] [--n <count>]`
 
@@ -79,8 +76,7 @@ can't be anchored by the cleaner's self-justification.
    - size and function length (`wc -l`, longest function per file),
    - nesting depth and lint density (`ruff check --statistics` for Python;
      the repo's own linter otherwise, if present),
-   - git churn (`git log --since=6.months --name-only`) — frequently-touched
-     files pay back most.
+   - git churn (`git log --since=6.months --name-only`).
 
    Exclude generated, vendored, and third-party code, tests, and migrations.
 4. Write `.cleanloop/STATE.md` (never committed): `STATUS: ACTIVE`, `N`,
@@ -98,10 +94,11 @@ can't be anchored by the cleaner's self-justification.
 2. **Establish the baseline.** Find existing tests covering the target
    (search the test tree for imports of the module). Run them **on the
    pre-clean code first** — if they fail there, log `skipped: baseline red`
-   and take the next candidate; a broken baseline can't verify anything. No
-   covering tests and the target obviously needs unavailable infra (live DB,
-   network) to exercise → log `skipped: unexercisable` and take the next.
-   No covering tests otherwise → the tester will characterize (step 5).
+   and take the next candidate; a broken baseline can't verify anything, and
+   "fixing" unrelated tests is not this loop's job. No covering tests and the
+   target obviously needs unavailable infra (live DB, network) to exercise →
+   log `skipped: unexercisable` and take the next. No covering tests
+   otherwise → the tester will characterize (step 5).
 3. **Clean.** Spawn the cleaner in the worktree. The brief: the target, the
    module-local behavior-preserving scope, and — for Python — an instruction
    to first read the installed simplify-python skill
@@ -114,25 +111,27 @@ can't be anchored by the cleaner's self-justification.
      complexity — a loop nested where there was none, work moved inside a
      loop, a list materialized where a generator streamed. No benchmarking.
 
-   REJECT → skip step 5 (a doomed diff doesn't earn a test run); go to
-   step 6.
+   REJECT → skip step 5; go to step 6.
 5. **Test.** Spawn the tester:
    - Covering tests exist → run them against the cleaned code; green = PASS.
+     On a FAIL, re-run the failing test once on the *original* — if it flakes
+     there too, treat coverage as absent and characterize instead.
    - No coverage → **characterize**: write throwaway tests in the scratchpad
      (pytest for Python; the repo's own test runner otherwise) that call the
      target's public functions on representative inputs (typical, edge,
      error-raising). Record golden outputs from the **original** code — read
      it via `git show HEAD:<path>` in the worktree (the cleanup is
      uncommitted, so worktree-HEAD *is* the pre-clean code; never stash, and
-     never record goldens from the cleaned code). Then assert the cleaned
-     code matches: same values, same exception types. Characterization files
-     never enter the repo.
+     never record goldens from the cleaned code — they'd match by
+     construction). Then assert the cleaned code matches: same values, same
+     exception types. Characterization files never enter the repo.
    - Exercising the target turns out to need unavailable infra →
      UNEXERCISABLE: treat as a failed gate with no retry; revert (step 6)
      and log `skipped: unexercisable` (it still consumed the cleaner run,
      but not an iteration).
 6. **Verdict.**
-   - Both gates pass → commit in the worktree:
+   - Both gates pass → stage the cleaner's files (nothing else) and commit
+     in the worktree:
      `refactor(<target>): <what was tidied>` — one commit per target — then
      log the attempt `accepted` with the commit sha.
    - A gate fails → **one retry**: re-spawn the cleaner with the concrete
@@ -143,9 +142,10 @@ can't be anchored by the cleaner's self-justification.
      git reset --hard HEAD && git clean -fd
      ```
 
-     (total by construction: accepted work is already committed, the
-     worktree is dedicated, and untracked leftovers — e.g. a new helper file
-     — die with `clean -fd`). Log `rejected: <gate>: <reason>`.
+     This is the only sanctioned revert — total by construction, since
+     accepted work is already committed and the worktree is dedicated. Never
+     per-file `git checkout --`: it can't remove files the cleaner created.
+     Log `rejected: <gate>: <reason>`.
 7. **Advance.** Count attempts in the log (`accepted` + `rejected`);
    `>= N` → stop; else loop.
 
@@ -163,19 +163,6 @@ report from the attempt log, cross-checked against `git log BASE..HEAD`:
   cleaning).
 - The branch name and worktree path, with the reminder that review + merge +
   worktree removal are the user's move.
-
-## Hazards
-
-| Hazard | Rule |
-|---|---|
-| Reviewer anchored by the cleaner | The reviewer sees the diff and rubric only — never the cleaner's transcript or rationale. Fresh reviewer every iteration and every retry. |
-| Goldens recorded from cleaned code | Worthless — they'd match by construction. Goldens come from `git show HEAD:<path>` per step 5; stashing is banned (a crashed tester mid-stash strands the cleanup invisibly). |
-| Baseline tests already red | Skip the target (step 2). A red baseline proves nothing about the cleanup; don't "fix" unrelated tests mid-run. |
-| Flaky tests masquerading as FAIL | On an equivalence FAIL, re-run the failing test once on the *original*; if it flakes there too, treat coverage as absent and characterize instead. |
-| Inventing cleanups to look busy | Zero-keep runs are valid (simplify-python contract rule 2). The dry stop exists so the loop never manufactures churn to hit N. |
-| Half-cleaned target surviving a rejection | Step 6's `reset --hard` + `clean -fd` is the only sanctioned revert. Never per-file `git checkout --` — it can't remove files the cleaner created. |
-| Scaffolding leaking into commits | Characterization tests live in the scratchpad; `.cleanloop/` is excluded via `.git/info/exclude` at init; commits contain only the target's files. |
-| Cleaning the user's checkout | Every edit/test/commit runs in `.cleanloop/worktree`. If the worktree is missing mid-run, stop — never fall back to the real checkout. |
 
 ## Resuming
 
