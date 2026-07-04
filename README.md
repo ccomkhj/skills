@@ -81,6 +81,7 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 |-------|---------|-------------|--------|
 | [organize-skill-mcp](./organize-skill-mcp) | 1.0.0 | Scan skill and MCP configs across Claude Code, Claude Desktop, Cursor, Windsurf, Codex, and Gemini CLI — global and per-project — and suggest cleanup | — |
 | [find-overlapping-skills](./find-overlapping-skills) | 1.0.0 | Collapse double-installs, cluster the rest into overlap groups, then resolve each group with the user, disabling non-keepers reversibly | — |
+| [improve-skills](./improve-skills) | 1.0.0 | Fold one lesson into one existing skill — collect lessons from the session or a direct ask, propose the exact edit, gate on user confirmation + feedback, then apply to a single skill (user-invoked `/improve-skills`) | — |
 
 ## Writing & code
 
