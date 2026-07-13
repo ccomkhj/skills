@@ -117,14 +117,9 @@ npx skills add ccomkhj/skills --full-depth
 
 ### Manual setup
 
-Alternatively, clone the repo and symlink it:
+Alternatively, clone the repo and run [`sync.sh`](./sync.sh) — it symlinks every skill (top-level and plugin-bundled) into both `~/.claude/skills` (Claude Code) and `~/.agents/skills` (Codex, Gemini CLI, …), one link per skill. Idempotent, and never clobbers a real file:
 
 ```bash
 git clone git@github.com:ccomkhj/skills.git
-
-# For Claude Code
-ln -s skills ~/.claude/skills
-
-# For other agents (e.g. Gemini CLI, Cursor, Codex)
-ln -s skills ~/.agents/skills
+./skills/sync.sh
 ```
