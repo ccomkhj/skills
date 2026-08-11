@@ -84,7 +84,7 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 |-------|---------|-------------|--------|
 | [humanizer](./humanizer) | 2.8.1 | Remove signs of AI-generated writing (significance inflation, em dashes, rule of three, AI vocabulary, filler, …) so text reads as human-written; based on Wikipedia's "Signs of AI writing" | Source from [blader/humanizer](https://github.com/blader/humanizer), improved here |
 | [simplify-python](./simplify-python) | 1.0.0 | Make recently written Python read better without changing behavior — idiomatic rewrites, flattened control flow, removed cruft. High-confidence, behavior-preserving rules only | — |
-| [slack-comm](./slack-comm) | 1.0.0 | Summarize the current Claude session's work into a very concise 3P (Progress/Plans/Problems) Slack status report, review it in chat, then stage it as a native Slack draft (via Slack MCP) for a final look before you send. User-invoked mid-session: `/slack-comm` | 3P/tone format adapted from [anthropics/skills internal-comms](https://github.com/anthropics/skills/tree/main/skills/internal-comms) |
+| [slack-comm](./slack-comm) | 3.0.0 | Summarize the current Claude session's work into a concise, evidence-driven IMPACT/CAUSE/FIX Slack report (blast radius first — including what was *not* affected, root cause, fix with explicit deploy state, plus an optional NOT AN ISSUE section so ruled-out red herrings don't become phantom action items) and stage it directly as a native Slack draft (via Slack MCP) — DM to you by default; the draft is where you review and send. User-invoked mid-session: `/slack-comm` | Tone principles adapted from [anthropics/skills internal-comms](https://github.com/anthropics/skills/tree/main/skills/internal-comms) |
 
 ## Utilities
 
