@@ -228,8 +228,9 @@ for r in ("a", "b", "c"):
 
 **Rule:** A docstring earns its place only by carrying what the reader *can't* get from the signature and body: the contract (what it guarantees, units, valid ranges), the *why*, non-obvious side effects, and which exceptions fire when. Shape (PEP 257):
 - Summary line in the **imperative** ("Return the parsed order", not "This function returns…" / "Returns…"), fits on one line, `"""triple double quotes"""`.
-- Multi-line: summary, blank line, then elaboration; closing `"""` on its own line. One-liner for obvious cases — closing quotes on the same line.
-- Document argument *names* if you document args at all; never restate types (they live in annotations).
+- **One line is the default.** A docstring earns a second line only when there is a real contract to state — units, valid ranges, a raised exception, a non-obvious side effect, a *why*. Absent that, one line; and a short private helper whose name and signature already say everything needs **no** docstring at all.
+- Multi-line: summary, blank line, then elaboration; closing `"""` on its own line.
+- Don't add an `Args:`/`Returns:`/`Raises:` block per argument by reflex. Name an argument only to say something the signature can't (units, valid range, ownership/mutation); never restate its type (that lives in the annotation) or its name back to the reader.
 
 ```python
 # no-op — parrots the signature
@@ -245,13 +246,39 @@ def price(order: Order) -> float:
     """
 ```
 
-**Anti-rule:** Simplifying is not documenting — don't **fabricate** docstrings for code that has none as part of a tidy pass unless asked; that's scope creep, and a wrong docstring is worse than none. Trim an existing docstring to only the non-obvious; delete one that merely narrates the code. Note that editing a docstring changes the observable `__doc__` and can break `doctest`s — so treat a doctest-bearing docstring as behavior, not prose.
+**The bloat trim — the common case.** Agent-written code arrives over-documented: every function, including three-line helpers, carrying a sectioned block that paraphrases its own signature. That is the docstring equivalent of dead code — cut it down to the one line that survives contact with the body.
+
+```python
+# before — 11 lines of docstring for 1 line of code
+def slugify(title: str) -> str:
+    """Convert a title to a slug.
+
+    This function takes a title string and converts it into a
+    URL-friendly slug by lowercasing it and replacing spaces.
+
+    Args:
+        title (str): The title to convert.
+
+    Returns:
+        str: The resulting slug.
+    """
+    return title.lower().replace(" ", "-")
+
+# after — the signature already said all of that
+def slugify(title: str) -> str:
+    """Return `title` lowercased with spaces replaced by hyphens."""
+    return title.lower().replace(" ", "-")
+```
+
+Delete on sight: "This function…" / "This method…" preambles; an `Args:` entry that repeats the parameter name and type; a `Returns:` entry that repeats the return annotation; a restatement of the body in prose; a `Notes:`/`Examples:` block invented for a function nobody asked for an example of. Keep on sight: units, valid ranges, which exception fires when, mutation of an argument, a *why*, and anything a caller would otherwise have to read the body to learn.
+
+**Anti-rule:** Simplifying is not documenting — don't **fabricate** docstrings for code that has none as part of a tidy pass unless asked; that's scope creep, and a wrong docstring is worse than none. Trimming is in scope, though: cut an existing docstring down to the non-obvious, and delete one that merely narrates the code. But don't trim a docstring that looks verbose while actually carrying contract — a long `Raises:` list on a public API is content, not bloat. Note that editing a docstring changes the observable `__doc__` and can break `doctest`s — so treat a doctest-bearing docstring as behavior, not prose.
 
 ---
 
 ## How to apply (agent loop)
 
-1. Read the recently-changed region. Identify candidate sites — idiom transforms, structural rules, and docstrings that parrot the code.
+1. Read the recently-changed region. Identify candidate sites — idiom transforms, structural rules, and docstrings that parrot the code or bury one line of contract in a sectioned `Args:`/`Returns:` block.
 2. For each candidate, check its **anti-rule** / cited trap first. If it fires, skip and move on.
 3. Make one small edit per tidying; keep them separable.
 4. Run tests / type-check / lint if available; results must be no worse than the pre-edit baseline. Green tests are necessary but **not sufficient** — they rarely cover the empty/`None`/falsy/exception edges where these rewrites break. So also state, in one sentence, why each hunk is behavior-identical; if a hunk touches a trap in python-gotchas.md and you can't make that one-sentence argument, revert it.
