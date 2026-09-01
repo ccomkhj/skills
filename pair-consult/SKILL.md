@@ -135,7 +135,7 @@ Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` 
 | `--number n` (alias `--rounds n`) | Requested **round cap / depth**, written to `ROUNDS:` — it's a max ([early termination](#early-termination--skip-ahead-when-theres-consensus) can end sooner). **Normalized to odd and `>= 3`** so A both proposes and synthesizes: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason *before* the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` Larger `n` = longer wall-clock (each round is a fresh peer cold-start), so flag very large values. | `5` |
 | `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `consult_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Omitted → empty `EFFORT:`, each CLI uses its own default. | unset |
 
-Note: only `high` and `xhigh` are accepted. Your `~/.codex/config.toml` may already default codex to `xhigh`, so `--model xhigh` is often a no-op for the codex peer; `--model high` is what visibly steps it down.
+Note: only `high` and `xhigh` are accepted. `~/.codex/config.toml` defaults codex to `xhigh` (`model_reasoning_effort = "xhigh"`), so `--model xhigh` is a no-op for the codex peer; `--model high` is what visibly steps it down.
 
 **Auto-detect Mode 2:** when `/pair-consult` is invoked with no question argument AND no existing `.consult/` AND the recent conversation contains a proposal you authored, default to Mode 2 without requiring `--from-session` explicitly. Otherwise prompt the user for a question.
 
