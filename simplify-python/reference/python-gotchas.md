@@ -15,12 +15,12 @@ The simplification rules in SKILL.md assume before/after are behavior-identical.
 
 ## 3. Early return vs `finally` / cleanup
 
-A guard-clause `return` jumps out of the function. If the original structure ran cleanup *after* the conditional (closing a file, releasing a lock, a trailing log/metric), an early return skips it — behavior change. Either keep the single-exit shape or move cleanup into `try/finally` / a context manager first.
+A guard-clause `return` jumps out of the function. If the original structure ran cleanup *after* the conditional (closing a file, releasing a lock, a trailing log/metric), an early return skips it — behavior change. A return inside `try` still executes its `finally`, and leaving a `with` executes its exit handling. Do not mechanically move ordinary cleanup into either: doing so can introduce cleanup on exception paths where it did not previously run.
 
 ## 4. Comprehensions can't replace every loop
 
 - No `break`/`continue` to an outer scope, no `try/except`, no statement-level side effects with guaranteed ordering you can reason about at a glance.
-- A generator expression is **lazy**: `(f(x) for x in xs)` doesn't run `f` until iterated, and runs it again on re-iteration. Replacing a list-building loop with a generator changes *when* (and whether) side effects happen and whether the result can be traversed twice. Match eager↔eager (`[...]`), lazy↔lazy.
+- A generator expression is **lazy**: `(f(x) for x in xs)` doesn't run `f` until iterated. Further iteration resumes from its current position; an exhausted generator produces no further items. Replacing a list-building loop with a generator changes *when* (and whether) side effects happen and whether the result can be traversed twice. Single consumption alone does not establish equivalent timing, exceptions, captured mutable state, or effects. Match eager↔eager (`[...]`), lazy↔lazy.
 - Exceptions raised inside a comprehension still propagate, but you lose the ability to handle per-item — don't fold a loop with per-item `try/except` into one.
 
 ## 5. Exception equivalence
@@ -61,6 +61,7 @@ Flattening or extracting code out of a generator function changes laziness. Movi
 
 ## 12. Division, float equality, bool-as-int
 
+- Inverse comparison operators are not universal complements: for NaN, `not (x > 0)` is true while `x <= 0` is false. Custom comparison methods can also differ. Retain the negated comparison unless the actual types justify inversion.
 - `/` is true division (float); `//` floors toward negative infinity (`-7 // 2 == -4`, not `-3`). Never swap them.
 - Don't introduce `==` between floats (`0.1 + 0.2 != 0.3`).
 - `bool` is an `int` subclass — don't assume a list of bools and a list of ints behave the same in arithmetic.
