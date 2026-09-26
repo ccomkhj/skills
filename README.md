@@ -60,10 +60,11 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 /lunch-clean-loop src/pipeline --n 2  # scoped, 2 iterations
 ```
 
-## Plan review
+## Problem framing & plan review
 
 | Skill | Version | Description | Source |
 |-------|---------|-------------|--------|
+| [first-principles](./first-principles) | 1.0.0 | Clarify a problem before planning through a brief, source-backed interview — one high-leverage question per turn, factual premises checked against code/docs/web and cited, assumptions labelled as such. Ends with an agreed problem frame (outcome, facts, constraints, assumptions/unknowns, implication + one next step), not an implementation plan. Use for first-principles thinking or to challenge a proposed solution's assumptions before doing work | — |
 | [review-markdown-plan](./review-markdown-plan) | 1.0.0 | **Deprecated** (use pair-\*). Review a markdown plan by section, annotating only concretely wrong steps | — |
 | [get-feedback-markdown-plan](./get-feedback-markdown-plan) | 1.0.0 | **Deprecated** (use pair-\*). Evaluate the inline feedback [review-markdown-plan](./review-markdown-plan) left, verifying each critique against the codebase | — |
 
