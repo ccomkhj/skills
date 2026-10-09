@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Usage Report</title>
+<style>
+:root {
+  --bg: #f7f6f3; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1db;
+  --accent: #b6532f; --accent-ink: #ffffff; --warn-bg: #fff4e0; --warn-ink: #7a4b00;
+  --ok: #2f7d4f; --dim: .42;
+  --c0: #5b7fa6; --c1: #c07a3b; --c2: #6c9a5b; --c3: #9b6aa8; --c4: #b9a24a; --c5: #4f9a9a; --c6: #a65b6b; --c7: #8a8a85;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #a09e97; --line: #34332f;
+    --accent: #e07a52; --accent-ink: #161615; --warn-bg: #3a2c12; --warn-ink: #f2c879;
+    --ok: #6cc28f; --dim: .38;
+    --c0: #6f93bb; --c1: #d08a4a; --c2: #7fb06d; --c3: #b07fbd; --c4: #cbb45a; --c5: #5fb0b0; --c6: #c0707f; --c7: #8f8e88;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #a09e97; --line: #34332f;
+  --accent: #e07a52; --accent-ink: #161615; --warn-bg: #3a2c12; --warn-ink: #f2c879;
+  --ok: #6cc28f; --dim: .38;
+  --c0: #6f93bb; --c1: #d08a4a; --c2: #7fb06d; --c3: #b07fbd; --c4: #cbb45a; --c5: #5fb0b0; --c6: #c0707f; --c7: #8f8e88;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding-bottom: 96px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+.meta { color: var(--muted); font-size: 12px; word-break: break-all; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.card .k { color: var(--muted); font-size: 12px; }
+.card .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .s { color: var(--muted); font-size: 12px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+details.flags { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+details.flags summary { cursor: pointer; font-weight: 600; }
+details.flags li { margin: 4px 0; }
+details.flags a { color: inherit; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.legend button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+#treemap { position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: var(--line); }
+.tm { position: absolute; overflow: hidden; border: 1px solid var(--panel); color: #fff; font-size: 11px; line-height: 1.2; padding: 3px 4px; cursor: pointer; }
+.tm:hover { filter: brightness(1.12); }
+.tm.sel { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 2; }
+.tm.saved { opacity: var(--dim); background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,.25) 6px 8px); }
+.tm b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm span { opacity: .85; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.toolbar input[type=search] { flex: 1 1 220px; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+#chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.chip.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.filter-note { font-size: 12px; color: var(--muted); min-height: 18px; }
+.filter-note button { font: inherit; font-size: 12px; border: 0; background: none; color: var(--accent); cursor: pointer; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--panel); }
+th[data-sort] { cursor: pointer; user-select: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.name { font-weight: 600; word-break: break-word; }
+.pv { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
+.note { font-size: 12px; margin-top: 3px; color: var(--muted); font-style: italic; }
+.flag { display: inline-block; font-size: 11px; background: var(--warn-bg); color: var(--warn-ink); border-radius: 4px; padding: 0 5px; margin-left: 4px; font-weight: 600; }
+.later { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 4px; color: var(--muted); font-weight: 400; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 4px; min-width: 60px; }
+.bar i { display: block; height: 4px; border-radius: 2px; }
+.src { font-size: 12px; color: var(--muted); }
+.state { font-family: var(--mono); font-size: 12px; }
+select { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); max-width: 170px; }
+tr.covered td { opacity: var(--dim); }
+tr.changed td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+tr.hl { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.save { color: var(--ok); font-weight: 600; }
+.link { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; padding: 0; margin-top: 3px; }
+footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); z-index: 10; }
+footer .wrap { padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+footer .sum { font-variant-numeric: tabular-nums; }
+footer .sum b { font-size: 16px; }
+footer .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font: inherit; border-radius: 8px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: default; }
+details.panel summary { cursor: pointer; }
+pre.plan { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12px/1.4 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-all; }
+.help { font-size: 12px; color: var(--muted); }
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; }
+@media (max-width: 640px) {
+  #treemap { height: 320px; }
+  .card .v { font-size: 19px; }
+  footer .wrap { justify-content: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Context usage</h1>
+  <div class="meta" id="meta"></div>
+  <div class="cards" id="cards"></div>
+  <div id="flags"></div>
+
+  <div class="panel">
+    <h2>Where the baseline goes</h2>
+    <div class="legend" id="legend"></div>
+    <div id="treemap" role="img" aria-label="Treemap of context usage by category"></div>
+    <p class="help">Box area is estimated tokens. Click a box to filter the table to its group. Striped boxes are removed by your current selection.</p>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search name, source, description" aria-label="Search">
+      <div id="chips"></div>
+    </div>
+    <div class="filter-note" id="fnote"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-sort="name">Item</th>
+          <th data-sort="group">Source</th>
+          <th data-sort="tokens" class="num">Tokens</th>
+          <th data-sort="state">State</th>
+          <th>Action</th>
+          <th>Scope</th>
+          <th class="num">Saves</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <details class="panel" id="plandetails">
+    <summary><b>Plan</b> <span class="help">Paste this back into Claude Code. It shows a dry run before changing any file.</span></summary>
+    <pre class="plan" id="plan"></pre>
+  </details>
+  <p class="help" id="method"></p>
+</div>
+
+<footer><div class="wrap">
+  <div class="sum" id="sum"></div>
+  <div class="btns">
+    <button class="btn" id="reset">Reset</button>
+    <button class="btn" id="dl">Download plan.json</button>
+    <button class="btn primary" id="copy">Copy plan</button>
+  </div>
+</div></footer>
+<div class="toast" id="toast"></div>
+
+<script>
+const REPORT = /*__REPORT_DATA__*/null;
+(function () {
+  const R = REPORT;
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else if (v !== undefined && v !== null) n.setAttribute(k, v);
+    }
+    for (const c of kids) if (c != null) n.append(c);
+    return n;
+  };
+  const fmt = (n) => Math.round(n).toLocaleString();
+  const SCOPE_LABEL = { global: "Global", project: "This project", "project-shared": "Project (shared)" };
+
+  const items = R.items;
+  const byId = Object.fromEntries(items.map((i) => [i.id, i]));
+  const counted = items.filter((i) => !i.rollup);
+  const pluginOf = {};
+  for (const p of items.filter((i) => i.rollup)) for (const m of p.members) pluginOf[m] = p.id;
+  const flagsBy = {};
+  for (const f of R.flags) (flagsBy[f.item] = flagsBy[f.item] || []).push(f.text);
+  const controllable = (it) => it.actions.length > 0 || (pluginOf[it.id] && byId[pluginOf[it.id]].actions.length > 0);
+
+  const catTotal = (c) => counted.filter((i) => i.category === c).reduce((a, i) => a + i.tokens, 0);
+  const cats = [...new Set(counted.map((i) => i.category))].sort((a, b) => catTotal(b) - catTotal(a));
+  const color = (c) => `var(--c${Math.max(0, cats.indexOf(c)) % 8})`;
+  const baseline = counted.reduce((a, i) => a + i.tokens, 0);
+
+  // Selections are a per-viewer convenience; the page works without storage.
+  const KEY = "mc:" + R.session_id + ":" + R.generated;
+  let sel = {};
+  try { sel = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { sel = {}; }
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(sel)); } catch (e) {} };
+
+  function savedMap() {
+    const m = {};
+    const put = (id, t) => { m[id] = Math.max(m[id] || 0, t); };
+    for (const [id, s] of Object.entries(sel)) {
+      const it = byId[id];
+      if (!it || !s.action) continue;
+      if (it.kind === "plugin") it.members.forEach((mid) => put(mid, byId[mid].tokens));
+      else if (s.action === "name-only") put(id, Math.max(0, it.tokens - (it.name_tokens || 0)));
+      else if (s.action === "on") put(id, 0);
+      else put(id, it.tokens);
+    }
+    return m;
+  }
+  const itemSaving = (it, saved) => it.rollup ? it.members.reduce((a, m) => a + (saved[m] || 0), 0) : (saved[it.id] || 0);
+  const sumSaved = (saved) => Object.values(saved).reduce((a, b) => a + b, 0);
+
+  // ---- header ----
+  $("meta").textContent = [R.project, "session " + R.session_id, R.model, "generated " + R.generated].filter(Boolean).join(" · ");
+  const actionable = counted.filter(controllable).reduce((a, i) => a + i.tokens, 0);
+  const card = (k, v, s) => el("div", { class: "card" }, el("div", { class: "k", text: k }), el("div", { class: "v", text: v }), el("div", { class: "s", text: s }));
+  function cards(saved) {
+    const s = sumSaved(saved);
+    $("cards").replaceChildren(
+      card("First-turn context", fmt(R.first_turn_tokens || baseline), "real usage before any work"),
+      card("Added after turn 1", "+" + fmt(R.later_tokens), "items that connected late"),
+      card("You can change", fmt(actionable), Math.round(100 * actionable / baseline) + "% of the baseline"),
+      card("Selected savings", fmt(s), s ? "baseline ~" + fmt(baseline) + " → ~" + fmt(baseline - s) : "pick actions below"),
+    );
+  }
+
+  if (R.flags.length) {
+    const ul = el("ul");
+    for (const f of R.flags) ul.append(el("li", {}, el("a", { href: "#", text: f.text, onclick: (e) => { e.preventDefault(); focusItem(f.item); } })));
+    $("flags").append(el("details", { class: "flags" }, el("summary", { text: `${R.flags.length} config mismatches: an item is still loaded although a setting says otherwise` }), ul));
+  }
+
+  for (const c of cats) $("legend").append(el("button", { onclick: () => { state.chip = "all"; state.group = null; state.focus = null; state.cat = c; render(); } }, el("i", { style: `background:${color(c)}` }), `${c} · ${fmt(catTotal(c))}`));
+
+  // ---- treemap (squarified) ----
+  function squarify(nodes, x, y, w, h) {
+    const out = [];
+    const total = nodes.reduce((a, n) => a + n.v, 0);
+    if (!total || w <= 0 || h <= 0) return out;
+    const scale = (w * h) / total;
+    let rest = nodes.map((n) => ({ ...n, a: n.v * scale })).filter((n) => n.a > 0);
+    while (rest.length) {
+      const short = Math.min(w, h);
+      const worst = (r) => {
+        const s = r.reduce((a, n) => a + n.a, 0);
+        const mx = Math.max(...r.map((n) => n.a)), mn = Math.min(...r.map((n) => n.a));
+        return Math.max((short * short * mx) / (s * s), (s * s) / (short * short * mn));
+      };
+      const row = [rest[0]];
+      let i = 1;
+      while (i < rest.length && worst([...row, rest[i]]) <= worst(row)) row.push(rest[i++]);
+      const thick = row.reduce((a, n) => a + n.a, 0) / short;
+      let off = 0;
+      for (const n of row) {
+        const len = n.a / thick;
+        out.push(w >= h ? { ...n, x, y: y + off, w: thick, h: len } : { ...n, x: x + off, y, w: len, h: thick });
+        off += len;
+      }
+      if (w >= h) { x += thick; w -= thick; } else { y += thick; h -= thick; }
+      rest = rest.slice(i);
+    }
+    return out;
+  }
+  function drawTreemap(saved) {
+    const box = $("treemap");
+    const W = box.clientWidth, H = box.clientHeight;
+    box.replaceChildren();
+    for (const t of squarify(cats.map((c) => ({ c, v: catTotal(c) })), 0, 0, W, H)) {
+      const kids = counted.filter((i) => i.category === t.c && i.tokens > 0)
+        .sort((a, b) => b.tokens - a.tokens)
+        .map((i) => ({ i, v: i.tokens }));
+      for (const r of squarify(kids, t.x, t.y, t.w, t.h)) {
+        const it = r.i;
+        const d = el("div", {
+          class: "tm" + (saved[it.id] ? " saved" : "") + (state.focus === it.id ? " sel" : ""),
+          title: `${it.name}\n${it.category} · ${it.group}\n~${fmt(it.tokens)} tokens`,
+          style: `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${color(it.category)}`,
+          onclick: () => focusItem(it.id),
+        });
+        if (r.w > 46 && r.h > 18) d.append(el("b", { text: it.name.replace(/^~\//, "") }));
+        if (r.w > 46 && r.h > 32) d.append(el("span", { text: fmt(it.tokens) }));
+        box.append(d);
+      }
+    }
+  }
+
+  // ---- table ----
+  const CHIPS = [
+    ["actionable", "Actionable"], ["all", "All"], ["skill", "Skills"], ["plugin", "Plugins"], ["mcp", "MCP"],
+    ["fixed", "Built-in"], ["memory", "Memory"], ["agent", "Agents"], ["flagged", "Mismatches"], ["changed", "Selected"],
+  ];
+  const state = { chip: "actionable", q: "", cat: null, group: null, focus: null, sort: "tokens", dir: -1 };
+  for (const [k, l] of CHIPS) $("chips").append(el("button", { class: "chip", "data-chip": k, text: l, onclick: () => { state.chip = k; state.cat = state.group = state.focus = null; render(); } }));
+  $("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); renderRows(savedMap()); });
+  document.querySelectorAll("th[data-sort]").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    state.dir = state.sort === k ? -state.dir : (k === "tokens" ? -1 : 1);
+    state.sort = k;
+    renderRows(savedMap());
+  }));
+
+  function matches(it) {
+    const c = state.chip;
+    if (c === "actionable" && !controllable(it) && !(it.rollup && it.actions.length)) return false;
+    if (["skill", "plugin", "mcp", "memory", "agent"].includes(c) && it.kind !== c) return false;
+    if (c === "fixed" && it.category !== "Built-in (fixed)") return false;
+    if (c === "flagged" && !flagsBy[it.id]) return false;
+    if (c === "changed" && !sel[it.id]) return false;
+    if (state.cat && it.category !== state.cat) return false;
+    if (state.group && it.group !== state.group) return false;
+    if (state.q && !`${it.name} ${it.group} ${it.preview} ${it.note}`.toLowerCase().includes(state.q)) return false;
+    return true;
+  }
+  const scopesFor = (it, action) => (it.actions.find((x) => x.value === action) || { scopes: [] }).scopes;
+
+  function renderRows(saved) {
+    const tb = $("rows");
+    tb.replaceChildren();
+    const rows = items.filter(matches).sort((a, b) => {
+      const va = a[state.sort], vb = b[state.sort];
+      return (typeof va === "number" ? va - vb : String(va).localeCompare(String(vb))) * state.dir;
+    });
+    const maxTok = Math.max(1, ...items.map((i) => i.tokens));
+    for (const it of rows) {
+      const s = sel[it.id] || {};
+      const pid = pluginOf[it.id];
+      const coveredBy = pid && sel[pid] && sel[pid].action;
+      const nameCell = el("td", {},
+        el("div", { class: "name" }, it.name,
+          flagsBy[it.id] ? el("span", { class: "flag", title: flagsBy[it.id].join("\n"), text: "mismatch" }) : null,
+          it.turn > 1 ? el("span", { class: "later", title: "Arrived after turn 1 (connected late)", text: "late" }) : null),
+        it.preview ? el("div", { class: "pv", text: it.preview }) : null,
+        it.note ? el("div", { class: "note", text: it.note }) : null,
+        pid && !it.actions.length ? el("button", { class: "link", text: "→ " + byId[pid].name + " plugin row", onclick: () => focusItem(pid) }) : null,
+      );
+      const tokCell = el("td", { class: "num", title: it.rollup ? "Sum of its items, not counted twice in totals" : "" },
+        fmt(it.tokens) + (it.rollup ? " Σ" : ""),
+        el("div", { class: "bar" }, el("i", { style: `width:${Math.max(2, 100 * it.tokens / maxTok)}%;background:${it.rollup ? "var(--accent)" : color(it.category)}` })));
+      let actCell, scopeCell;
+      if (it.actions.length) {
+        const a = el("select", { "aria-label": "Action for " + it.name, onchange: (e) => {
+          const v = e.target.value;
+          if (!v) delete sel[it.id];
+          else {
+            const sc = scopesFor(it, v), prev = (sel[it.id] || {}).scope;
+            sel[it.id] = { action: v, scope: sc.includes(prev) ? prev : (sc.includes("project") ? "project" : sc[0]) };
+          }
+          persist(); render();
+        } }, el("option", { value: "", text: "Keep" }));
+        for (const x of it.actions) a.append(el("option", { value: x.value, text: x.label }));
+        a.value = s.action || "";
+        actCell = el("td", {}, a);
+        const scs = s.action ? scopesFor(it, s.action) : [];
+        const sc = el("select", { "aria-label": "Scope for " + it.name, disabled: scs.length > 1 ? null : "", onchange: (e) => { sel[it.id].scope = e.target.value; persist(); render(); } });
+        for (const v of scs.length ? scs : ["—"]) sc.append(el("option", { value: v, text: SCOPE_LABEL[v] || v }));
+        if (s.scope) sc.value = s.scope;
+        scopeCell = el("td", {}, sc);
+      } else {
+        actCell = el("td", { class: "src", text: coveredBy ? "covered by plugin" : "—" });
+        scopeCell = el("td", {});
+      }
+      const sv = itemSaving(it, saved);
+      tb.append(el("tr", { id: "row-" + it.id, class: [coveredBy ? "covered" : "", sel[it.id] ? "changed" : "", state.focus === it.id ? "hl" : ""].join(" ").trim() },
+        nameCell,
+        el("td", { class: "src" }, it.category, el("br"), it.group),
+        tokCell,
+        el("td", { class: "state", text: it.state || "on" }),
+        actCell, scopeCell,
+        el("td", { class: "num" + (sv ? " save" : ""), text: sv ? "−" + fmt(sv) : "" }),
+      ));
+    }
+    if (!rows.length) tb.append(el("tr", {}, el("td", { colspan: 7, class: "src", text: "Nothing matches this filter." })));
+    document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.chip === state.chip && !state.cat));
+    const f = [state.cat, state.group].filter(Boolean).join(" › ");
+    $("fnote").replaceChildren(...(f ? ["Filtered to ", el("b", { text: f }), " ", el("button", { text: "clear", onclick: () => { state.cat = state.group = state.focus = null; render(); } })] : []));
+  }
+
+  function plan() {
+    const saved = savedMap();
+    const actions = Object.entries(sel).filter(([id, s]) => byId[id] && s.action).map(([id, s]) => {
+      const it = byId[id];
+      const a = { kind: it.kind, target: it.name, action: s.action, scope: s.scope, est_tokens: itemSaving(it, saved) };
+      if (it.plugin_id) a.plugin_id = it.plugin_id;
+      if (it.source) a.source = it.source;
+      return a;
+    });
+    return { manage_context_plan: 1, project: R.project, session_id: R.session_id, generated: R.generated, actions };
+  }
+
+  function render() {
+    const saved = savedMap();
+    cards(saved);
+    drawTreemap(saved);
+    renderRows(saved);
+    const p = plan(), total = sumSaved(saved);
+    $("sum").replaceChildren(el("b", { text: `${p.actions.length} change${p.actions.length === 1 ? "" : "s"}` }),
+      ` · saves ~${fmt(total)} tokens (${Math.round(100 * total / baseline)}%) · baseline ~${fmt(baseline)} → ~${fmt(baseline - total)}`);
+    $("plan").textContent = JSON.stringify(p, null, 2);
+    $("copy").disabled = $("dl").disabled = !p.actions.length;
+  }
+
+  function focusItem(id) {
+    const it = byId[id];
+    if (!it) return;
+    Object.assign(state, { chip: "all", cat: it.category, group: it.group, focus: id, q: "" });
+    $("q").value = "";
+    render();
+    const r = document.getElementById("row-" + id);
+    if (r) r.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+  function toast(t) { const x = $("toast"); x.textContent = t; x.classList.add("show"); setTimeout(() => x.classList.remove("show"), 1800); }
+
+  $("copy").addEventListener("click", async () => {
+    const text = JSON.stringify(plan(), null, 2);
+    try { await navigator.clipboard.writeText(text); toast("Plan copied. Paste it into Claude Code."); }
+    catch (e) {
+      $("plandetails").open = true;
+      const r = document.createRange(); r.selectNodeContents($("plan"));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      toast("Plan selected. Press ⌘C or Ctrl+C.");
+    }
+  });
+  $("dl").addEventListener("click", () => {
+    const a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(plan(), null, 2)], { type: "application/json" })), download: "context-plan.json" });
+    document.body.append(a); a.click(); a.remove();
+  });
+  $("reset").addEventListener("click", () => { sel = {}; persist(); render(); });
+  let rz;
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => drawTreemap(savedMap()), 120); });
+
+  $("method").textContent = `Method: each item is sized by its characters in the session transcript and divided by one ratio (${R.chars_per_token} chars/token, ${R.calibrated ? "calibrated so turn-1 items add up to the real first-turn usage" : "default, because calibration was out of range; the residual is shown as Unattributed"}). The total is real; per-item numbers are estimates, since JSON tool schemas and prose tokenize differently. Changes apply from the next session. Transcript: ${R.transcript}.`;
+  render();
+})();
+</script>
+</body>
+</html>
