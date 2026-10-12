@@ -28,7 +28,7 @@ ROUND: 2
 ROUNDS: 5                  # round cap (max) this session — odd, >=3, default 5; fixed for the session
 A: claude                  # whoever proposed in R1 — fixed for the session
 B: codex                   # the peer — fixed for the session
-EFFORT:                    # optional peer reasoning effort (high|xhigh); empty = each CLI's default
+EFFORT: high               # peer reasoning effort (high|xhigh); empty = consult_handoff falls back to high
 
 ## Round log
 | Round | Actor  | Output | Notes                                 |
@@ -43,7 +43,7 @@ EFFORT:                    # optional peer reasoning effort (high|xhigh); empty 
 - **`ROUND` points to the next round to execute** (not the one just completed). After completing round N, set `ROUND: N+1` on handoff. The final round's actor (always A) leaves `ROUND: <ROUNDS>` and sets `STATUS: AWAITING_USER`. `consult_handoff` greps this value to name the next peer's log file (`round-${ROUND}-${peer}.log`).
 - **`ROUNDS` is fixed for the session** and set at init from `--number n` — a round cap/depth normalized to odd and `>=3` so A always proposes *and* synthesizes (early termination may end before it; see SKILL.md). `consult_handoff` reads it to know which round is final; absent → treated as 5.
 - **`A` and `B` are fixed for the session.** Whoever proposed in R1 is A; the peer is B. Do not swap mid-session.
-- **`EFFORT` is fixed for the session** and set at init from `--model high|xhigh`. `consult_handoff` injects it into every peer invocation (`codex exec -c model_reasoning_effort=…` / `claude --effort …`); empty means no flag is added and each CLI uses its own default.
+- **`EFFORT` is fixed for the session** and set at init from `--model high|xhigh`, defaulting to `high`. `consult_handoff` injects it into every peer invocation (`codex exec -c model_reasoning_effort=…` / `claude --effort …`); if the line is empty it falls back to `high`. The codex peer's model is not stored here — `consult_handoff` pins `-m gpt-6-astra` (override with `PAIR_CONSULT_CODEX_MODEL`).
 - `STATUS: WAITING: <peer>` is what `consult_handoff` looks for to know who to invoke.
 
 ### Templates are role-typed, not round-number-typed
