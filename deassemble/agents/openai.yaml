@@ -1,0 +1,4 @@
+interface:
+  display_name: "deassemble"
+  short_description: "Run code. Inspect real state. Explore every captured step."
+  default_prompt: "Use deassemble on this project. Run it safely, capture startup and one meaningful scenario, and create an interactive walkthrough grounded in real execution evidence."

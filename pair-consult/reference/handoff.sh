@@ -81,10 +81,12 @@ consult_handoff() {
   rounds=$(awk '/^ROUNDS:/ {print $2; exit}' .consult/STATE.md)
   rounds=${rounds:-5}
 
-  # Reasoning effort for the peer (optional). When empty we inject no flag and
-  # each CLI uses its own default. Written once at init from --model.
+  # Reasoning effort for the peer. Written once at init from --model; when
+  # STATE.md leaves it empty we fall back to the skill default (high) rather
+  # than each CLI's own default, so a peer round is always deep.
   local effort
   effort=$(awk '/^EFFORT:/ {print $2; exit}' .consult/STATE.md)
+  effort=${effort:-high}
 
   if (( round < 1 || round > rounds )); then
     echo "consult_handoff: ROUND=$round out of range; the loop has only $rounds rounds." >&2
@@ -112,19 +114,24 @@ consult_handoff() {
     buf=(stdbuf -oL -eL)
   fi
 
-  # Per-CLI effort flag, only added when EFFORT: is set. codex takes it as a
-  # config override (-c model_reasoning_effort=...); claude has a first-class
-  # --effort. Both accept high|xhigh verbatim. Empty array = true no-op.
+  # Per-CLI effort flag. codex takes it as a config override
+  # (-c model_reasoning_effort=...); claude has a first-class --effort. Both
+  # accept high|xhigh verbatim.
   local codex_effort=() claude_effort=()
   if [[ -n "$effort" ]]; then
     codex_effort=(-c "model_reasoning_effort=$effort")
     claude_effort=(--effort "$effort")
   fi
 
+  # Model the codex peer runs on. Pinned here so the peer doesn't drift with
+  # ~/.codex/config.toml; override per-shell with PAIR_CONSULT_CODEX_MODEL.
+  local codex_model="${PAIR_CONSULT_CODEX_MODEL:-gpt-6-astra}"
+
   case "$peer" in
     codex)
       ( nohup "${buf[@]}" codex exec \
           -s workspace-write \
+          -m "$codex_model" \
           "${codex_effort[@]}" \
           -C "$(pwd)" \
           --skip-git-repo-check \
@@ -147,7 +154,9 @@ consult_handoff() {
   local pid=$!
   disown
 
-  echo "consult_handoff: invoked $peer for round $round (pid $pid, log $logfile, live: consult_watch)"
+  local shown_model="$peer"
+  [[ "$peer" == codex ]] && shown_model="$codex_model"
+  echo "consult_handoff: invoked $peer ($shown_model, effort $effort) for round $round (pid $pid, log $logfile, live: consult_watch)"
   echo "consult_handoff: NEXT — call 'consult_wait' (Bash run_in_background=true in Claude Code)."
   echo "                 The peer is nohup'd and invisible to the harness; without consult_wait you will idle."
 }

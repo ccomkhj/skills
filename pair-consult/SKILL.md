@@ -115,7 +115,7 @@ Create `.consult/` at the repo root on init and append `.consult/` to `.gitignor
 
 ## Entry modes
 
-Both modes accept the optional flags in [Flags](#flags) (`--number n`, `--model high|xhigh`). Parse them off the invocation first, then write the resolved `ROUNDS:` and `EFFORT:` into `STATE.md` at init.
+Both modes accept the optional flags in [Flags](#flags) (`--number n`, `--model high|xhigh`). Parse them off the invocation first, then write the resolved `ROUNDS:` and `EFFORT:` into `STATE.md` at init. With no `--model`, write `EFFORT: high` — the codex peer runs `gpt-6-astra` at high reasoning depth by default.
 
 ### Mode 1 — fresh question: `/pair-consult "<question>" [--number n] [--model high|xhigh]`
 Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` (`ROUND: 1`, `ROUNDS: <n>`, `STATUS: ACTIVE: <you>`, `A: <you>`, `B: <peer>`, `EFFORT: <effort>`), then do R1 as described in the Round protocol. After R1, `ROUND: 2`, `STATUS: WAITING: <peer>`, then `consult_handoff <peer>` + `consult_wait` and stay alive for the rest of A's rounds (every odd round through the final).
@@ -133,9 +133,11 @@ Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` 
 | Flag | Meaning | Default |
 |---|---|---|
 | `--number n` (alias `--rounds n`) | Requested **round cap / depth**, written to `ROUNDS:` — it's a max ([early termination](#early-termination--skip-ahead-when-theres-consensus) can end sooner). **Normalized to odd and `>= 3`** so A both proposes and synthesizes: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason *before* the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` Larger `n` = longer wall-clock (each round is a fresh peer cold-start), so flag very large values. | `5` |
-| `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `consult_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Omitted → empty `EFFORT:`, each CLI uses its own default. | unset |
+| `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `consult_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Omitted → `EFFORT:` is left empty and `consult_handoff` falls back to `high`. | `high` |
 
-Note: only `high` and `xhigh` are accepted. `~/.codex/config.toml` defaults codex to `xhigh` (`model_reasoning_effort = "xhigh"`), so `--model xhigh` is a no-op for the codex peer; `--model high` is what visibly steps it down.
+Note: only `high` and `xhigh` are accepted. The flag sets *reasoning depth*, not which model runs — the codex peer is pinned to **`gpt-6-astra` at `high`** (see below), so `--model high` restates the default and `--model xhigh` is the only value that changes anything.
+
+**Peer model.** `consult_handoff` passes `codex exec -m gpt-6-astra` explicitly, so the peer doesn't drift with whatever `model` is set in `~/.codex/config.toml` (currently `gpt-6-astra`, `model_reasoning_effort = "medium"` — the skill overrides that effort to `high`). Override per-shell with `PAIR_CONSULT_CODEX_MODEL=<id>` before sourcing/calling `consult_handoff`. The claude peer has no model pin; it runs the CLI's own default at `--effort high`.
 
 **Auto-detect Mode 2:** when `/pair-consult` is invoked with no question argument AND no existing `.consult/` AND the recent conversation contains a proposal you authored, default to Mode 2 without requiring `--from-session` explicitly. Otherwise prompt the user for a question.
 

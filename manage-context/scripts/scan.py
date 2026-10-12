@@ -9,10 +9,17 @@ ratio so the baseline matches the real first-turn usage in the same transcript.
 Config files are read only to map items to the setting that controls them.
 
     scan.py [--project DIR] [--session ID|PATH] [--out DIR]
+            [--history-days N] [--no-history] [--mode bear|bull]
 
 Writes <out>/context-report.html and <out>/context-report.json; prints a summary.
 Never copies memory-file contents, session context or MCP config values into
 the report: only names, paths, sizes and short skill/tool description previews.
+
+Usage history (scripts/usage.py) counts how often each skill, MCP server and
+agent was used across all transcripts in the window, and each item gets a
+recommendation in two modes: bear (convert only what the model never uses)
+and bull (convert everything the model does not use regularly). The rules
+are in references/recommendations.md.
 """
 
 from __future__ import annotations
@@ -30,10 +37,19 @@ CLAUDE_DIR = HOME / ".claude"
 CLAUDE_JSON = HOME / ".claude.json"
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE = SCRIPT_DIR / "report_template.html"
+sys.path.insert(0, str(SCRIPT_DIR))
+from usage import collect as collect_usage  # noqa: E402
 
 DEFAULT_CPT = 3.5  # chars per token when calibration is impossible
 CPT_RANGE = (2.0, 5.0)  # outside this the calibration is distrusted
 PREVIEW = 160
+HISTORY_DAYS = 90
+
+# Recommendation thresholds; see references/recommendations.md
+EVIDENCE = {"bear": 5, "bull": 2}  # sessions that listed the item before judging it
+BULL_STALE_DAYS = 30  # bull: a model call older than this does not count as regular use
+BULL_RARE_RATE = 0.05  # bull: model sessions / listed sessions below this -> name-only
+UIO = "user-invocable-only"
 
 
 # ---------- small helpers ----------
@@ -320,7 +336,7 @@ def mcp_server_for_tool(tool: str, servers: set[str], cfg: Config) -> str | None
 # ---------- build items ----------
 
 
-def build(project: Path, transcript: Path) -> dict:
+def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
     cfg = Config(project)
     tr = parse_transcript(transcript)
     items: list[dict] = []
@@ -658,8 +674,15 @@ def build(project: Path, transcript: Path) -> dict:
         )
 
     later = sum(i["tokens"] for i in counted if i["turn"] > 1)
+    if history:
+        attach_usage(items, history, servers, cfg)
+        for i in items:
+            i["rec"] = {m: recommend(i, history, m) for m in ("bear", "bull")}
     return {
         "generated": dt.datetime.now().isoformat(timespec="seconds"),
+        "history": (
+            {k: history[k] for k in ("days", "since", "sessions")} if history else None
+        ),
         "project": str(project),
         "transcript": str(transcript).replace(str(HOME), "~"),
         "session_id": tr["session_id"],
@@ -676,15 +699,173 @@ def build(project: Path, transcript: Path) -> dict:
     }
 
 
+# ---------- usage history and recommendations ----------
+
+EMPTY = {
+    "model": 0,
+    "user": 0,
+    "listed": 0,
+    "sessions_model": 0,
+    "sessions_user": 0,
+    "last_model": "",
+    "last_user": "",
+}
+
+
+def _u(history: dict, kind: str, name: str) -> dict:
+    by = history.get(kind, {}).get(name) or {}
+    return {s: {**EMPTY, **(by.get(s) or {})} for s in ("all", "here")}
+
+
+def attach_usage(items: list[dict], history: dict, servers: set[str], cfg: Config):
+    """Give every skill, MCP, agent and plugin item a usage block {all, here}."""
+    by_display: dict[str, dict] = {}
+    for prefix, by in history.get("mcp", {}).items():
+        disp = mcp_server_for_tool(f"mcp__{prefix}__x", servers, cfg)
+        if disp:
+            by_display[disp] = by
+    mcp_hist = {"mcp": by_display}
+    by_id = {i["id"]: i for i in items}
+    for i in items:
+        if i["kind"] == "skill":
+            i["usage"] = _u(history, "skills", i["name"])
+        elif i["kind"] == "mcp":
+            i["usage"] = _u(mcp_hist, "mcp", i["name"])
+        elif i["kind"] == "agent":
+            i["usage"] = _u(history, "agents", i["name"])
+    for p in items:
+        if not p["rollup"]:
+            continue
+        agg = {s: dict(EMPTY) for s in ("all", "here")}
+        for mid in p["members"]:
+            u = by_id[mid].get("usage")
+            if not u:
+                continue
+            for s in agg:
+                for k in ("model", "user", "sessions_model", "sessions_user"):
+                    agg[s][k] += u[s][k]
+                for k in ("last_model", "last_user", "listed"):
+                    agg[s][k] = max(agg[s][k], u[s][k])
+        p["usage"] = agg
+
+
+def _days_ago(date: str) -> int | None:
+    if not date:
+        return None
+    return (dt.date.today() - dt.date.fromisoformat(date)).days
+
+
+def _rec(action: str, scope: str, tokens: int, reason: str) -> dict:
+    return {"action": action, "scope": scope, "est_tokens": tokens, "reason": reason}
+
+
+def recommend(it: dict, history: dict, mode: str) -> dict | None:
+    """Bear converts only what the model never used; bull everything it does not use regularly."""
+    u = it.get("usage")
+    acts = {a["value"]: a["scopes"] for a in it["actions"]}
+    if not u or not acts:
+        return None
+    sessions = history["sessions"]
+    A, H = u["all"], u["here"]
+    need = EVIDENCE[mode]
+    days = history["days"]
+
+    if it["kind"] == "skill":
+        if UIO not in acts or it["state"] != "on":
+            return None  # plugin skill, or already overridden
+        model_s, listed = A["sessions_model"], A["listed"]
+        typed = (
+            f" · you typed /{it['name']} {A['user']}× (still works)" if A["user"] else ""
+        )
+        if listed < need:
+            return None
+        # A project layer that pins the skill "on" beats a global override, so
+        # the change has to land in this project's settings.local.json.
+        pinned = acts.get("on", [None])[0] in ("project", "project-shared")
+        wide = "project" if pinned else "global"
+        pin = " · a project setting pins it on, so this is project scope" if pinned else ""
+        if model_s == 0:
+            return _rec(UIO, wide, it["tokens"],
+                        f"listed in {listed} sessions, model never called it{typed}{pin}")
+        if mode == "bear":
+            return None
+        age = _days_ago(A["last_model"])
+        if model_s <= 1 or (age is not None and age > BULL_STALE_DAYS):
+            return _rec(UIO, wide, it["tokens"],
+                        f"model called it in {model_s} of {listed} sessions, last {A['last_model']}"
+                        f" ({age}d ago){typed}{pin}")
+        if H["listed"] >= need and H["sessions_model"] == 0:
+            return _rec(UIO, "project", it["tokens"],
+                        f"model never called it in this project ({H['listed']} sessions); "
+                        f"{model_s} sessions elsewhere{typed}")
+        if model_s / listed < BULL_RARE_RATE and "name-only" in acts:
+            return _rec("name-only", wide, max(0, it["tokens"] - it.get("name_tokens", 0)),
+                        f"model called it in {model_s} of {listed} sessions "
+                        f"({100 * model_s / listed:.1f}%): keep the name, drop the description{pin}")
+        return None
+
+    if "disable" not in acts:
+        return None
+    scopes = acts["disable"]
+    glob = "global" if "global" in scopes else "project"
+    label = "calls" if it["kind"] == "mcp" else "uses"
+    total_all = A["model"] + A["user"]
+    total_here = H["model"] + H["user"]
+    # sessions that loaded the item; plugins fall back to all sessions
+    loaded_all = A["listed"] or sessions["all"]
+    loaded_here = H["listed"] or sessions["here"]
+    if loaded_all < need:
+        return None
+    if total_all == 0:
+        return _rec("disable", glob, it["tokens"],
+                    f"0 {label} in the {loaded_all} sessions that loaded it over {days} days")
+    if mode == "bear":
+        return None
+    if total_here == 0 and loaded_here >= need and "project" in scopes:
+        return _rec("disable", "project", it["tokens"],
+                    f"0 {label} in this project ({loaded_here} sessions); "
+                    f"{total_all} elsewhere")
+    return None
+
+
+def print_recommendations(report: dict):
+    hist = report.get("history")
+    if not hist:
+        return
+    print(
+        f"history: {hist['sessions']['all']} sessions over {hist['days']} days "
+        f"(since {hist['since']}), {hist['sessions']['here']} in this project"
+    )
+    for mode in ("bear", "bull"):
+        recs = [(i, i["rec"][mode]) for i in report["items"] if i.get("rec", {}).get(mode)]
+        # a plugin recommendation already covers its members
+        covered = {m for i, _ in recs if i["rollup"] for m in i["members"]}
+        recs = [(i, r) for i, r in recs if i["id"] not in covered]
+        recs.sort(key=lambda x: -x[1]["est_tokens"])
+        total = sum(r["est_tokens"] for _, r in recs)
+        print(f"{mode}: {len(recs)} recommendation(s), saves ~{total} tokens")
+        for i, r in recs[:8]:
+            print(f"  {i['kind']} {i['name']}: {r['action']} ({r['scope']}, ~{r['est_tokens']}) — {r['reason']}")
+        if len(recs) > 8:
+            print(f"  … {len(recs) - 8} more in the report")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--project", default=os.getcwd())
     ap.add_argument("--session", help="session id or path to a transcript .jsonl")
     ap.add_argument("--out", default=None, help="output directory")
+    ap.add_argument("--history-days", type=int, default=HISTORY_DAYS,
+                    help="window of transcripts to mine for usage (default 90)")
+    ap.add_argument("--no-history", action="store_true", help="skip usage mining and recommendations")
+    ap.add_argument("--mode", choices=("bear", "bull"), default="bear",
+                    help="recommendation mode the report opens in")
     args = ap.parse_args()
     project = Path(args.project).resolve()
     transcript = find_transcript(project, args.session)
-    report = build(project, transcript)
+    history = None if args.no_history else collect_usage(args.history_days, project)
+    report = build(project, transcript, history)
+    report["mode"] = args.mode
     out = Path(args.out or CLAUDE_DIR / "context-reports" / project_slug(project))
     out.mkdir(parents=True, exist_ok=True)
     (out / "context-report.json").write_text(json.dumps(report, indent=1))
@@ -711,6 +892,7 @@ def main():
     for cat, tok in sorted(by_cat.items(), key=lambda x: -x[1]):
         print(f"  {cat:<22} {tok:>7}")
     print(f"actionable: ~{actionable} tokens · flags: {len(report['flags'])}")
+    print_recommendations(report)
     print(f"html: {out / 'context-report.html'}")
 
 

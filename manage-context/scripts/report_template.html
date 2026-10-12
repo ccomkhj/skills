@@ -92,6 +92,23 @@ footer .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 details.panel summary { cursor: pointer; }
 pre.plan { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12px/1.4 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-all; }
 .help { font-size: 12px; color: var(--muted); }
+.modes { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.modes button { font: inherit; font-size: 12px; border: 0; background: var(--bg); color: var(--ink); padding: 5px 12px; cursor: pointer; }
+.modes button.on { background: var(--ink); color: var(--panel); }
+.rechead { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rechead .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.recsum { font-size: 13px; }
+.recsum b { font-variant-numeric: tabular-nums; }
+.reclist { margin: 8px 0 0; padding: 0; list-style: none; max-height: 300px; overflow: auto; border-top: 1px solid var(--line); }
+.reclist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; align-items: start; }
+.reclist .rn { font-weight: 600; word-break: break-word; }
+.reclist .rr { color: var(--muted); grid-column: 1 / -1; }
+.reclist .rs { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reclist li.picked .rn::before { content: "✓ "; color: var(--ok); }
+.rec { display: inline-block; font-size: 11px; border-radius: 4px; padding: 0 5px; margin-top: 3px; margin-right: 4px; cursor: pointer; border: 1px solid var(--accent); color: var(--accent); background: none; font-family: inherit; }
+.rec.on { background: var(--accent); color: var(--accent-ink); }
+.use { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.use b { color: var(--ink); font-weight: 600; }
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
 .toast.show { opacity: 1; }
 @media (max-width: 640px) {
@@ -107,6 +124,25 @@ pre.plan { background: var(--bg); border: 1px solid var(--line); border-radius: 
   <div class="meta" id="meta"></div>
   <div class="cards" id="cards"></div>
   <div id="flags"></div>
+
+  <div class="panel" id="recpanel" hidden>
+    <div class="rechead">
+      <div>
+        <h2 style="margin:0 0 4px">Recommendations</h2>
+        <div class="recsum" id="recsum"></div>
+      </div>
+      <div class="btns">
+        <div class="modes" role="group" aria-label="Recommendation mode">
+          <button type="button" data-mode="bear" title="Conservative: convert only what the model never called in the window">Bear</button>
+          <button type="button" data-mode="bull" title="Aggressive: convert everything the model does not call regularly">Bull</button>
+        </div>
+        <button class="btn" id="recclear">Clear selection</button>
+        <button class="btn primary" id="recall">Select all</button>
+      </div>
+    </div>
+    <p class="help" id="rechelp"></p>
+    <ul class="reclist" id="reclist"></ul>
+  </div>
 
   <div class="panel">
     <h2>Where the baseline goes</h2>
@@ -127,6 +163,7 @@ pre.plan { background: var(--bg); border: 1px solid var(--line); border-radius: 
           <th data-sort="name">Item</th>
           <th data-sort="group">Source</th>
           <th data-sort="tokens" class="num">Tokens</th>
+          <th data-sort="usage" title="Model calls · your /slash calls in the history window">Usage</th>
           <th data-sort="state">State</th>
           <th>Action</th>
           <th>Scope</th>
@@ -193,6 +230,31 @@ const REPORT = /*__REPORT_DATA__*/null;
   try { sel = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { sel = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(sel)); } catch (e) {} };
 
+  // Recommendation mode: bear (conservative) or bull (aggressive).
+  const HAS_HIST = !!R.history;
+  let mode = R.mode || "bear";
+  try { mode = localStorage.getItem("mc:mode") || mode; } catch (e) {}
+  const recOf = (it) => HAS_HIST && it.rec ? it.rec[mode] : null;
+  const recRows = () => {
+    const rows = items.filter(recOf);
+    const covered = new Set();
+    for (const p of rows) if (p.rollup) p.members.forEach((m) => covered.add(m));
+    return rows.filter((i) => !covered.has(i.id)).sort((a, b) => recOf(b).est_tokens - recOf(a).est_tokens);
+  };
+  const isPicked = (it) => { const r = recOf(it), s = sel[it.id]; return !!(r && s && s.action === r.action && s.scope === r.scope); };
+  const pick = (it) => { const r = recOf(it); if (r) sel[it.id] = { action: r.action, scope: r.scope }; };
+  const usageText = (it) => {
+    const u = it.usage;
+    if (!u) return null;
+    const a = u.all, h = u.here;
+    const parts = [];
+    if (it.kind === "mcp" || it.kind === "agent") parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " calls"));
+    else { parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " model")); parts.push(el("span", {}, el("b", { text: fmt(a.user) }), " you")); }
+    const last = [a.last_model, a.last_user].filter(Boolean).sort().pop();
+    const title = `All projects: ${a.model} model · ${a.user} you${a.listed ? ` · loaded in ${a.listed} sessions` : ""}\nThis project: ${h.model} model · ${h.user} you${h.listed ? ` · loaded in ${h.listed}` : ""}${last ? `\nLast used ${last}` : ""}`;
+    return el("div", { class: "use", title }, ...parts.flatMap((x, i) => i ? [" · ", x] : [x]), last ? el("div", { text: last }) : null);
+  };
+
   function savedMap() {
     const m = {};
     const put = (id, t) => { m[id] = Math.max(m[id] || 0, t); };
@@ -220,8 +282,38 @@ const REPORT = /*__REPORT_DATA__*/null;
       card("Added after turn 1", "+" + fmt(R.later_tokens), "items that connected late"),
       card("You can change", fmt(actionable), Math.round(100 * actionable / baseline) + "% of the baseline"),
       card("Selected savings", fmt(s), s ? "baseline ~" + fmt(baseline) + " → ~" + fmt(baseline - s) : "pick actions below"),
+      HAS_HIST ? card(mode === "bear" ? "Bear suggests" : "Bull suggests", fmt(recRows().reduce((a, i) => a + recOf(i).est_tokens, 0)), `${recRows().length} changes · ${R.history.sessions.all} sessions / ${R.history.days} days`) : null,
     );
   }
+
+  function renderRecs() {
+    if (!HAS_HIST) return;
+    $("recpanel").hidden = false;
+    document.querySelectorAll(".modes button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+    const rows = recRows();
+    const total = rows.reduce((a, i) => a + recOf(i).est_tokens, 0);
+    const picked = rows.filter(isPicked).length;
+    $("recsum").replaceChildren(el("b", { text: `${mode === "bear" ? "Bear" : "Bull"}: ${rows.length} change${rows.length === 1 ? "" : "s"}` }),
+      ` · saves ~${fmt(total)} tokens (${Math.round(100 * total / baseline)}%)` + (picked ? ` · ${picked} selected` : ""));
+    $("rechelp").textContent = mode === "bear"
+      ? `Conservative. Skills the model never called in ${R.history.days} days become user-invocable only (your /slash still works). MCP servers and plugins with zero use anywhere are disabled.`
+      : `Aggressive. Also converts skills the model called once, not in ${R.history.days} days of this project, or in under 5% of sessions (name-only), and disables servers and plugins unused in this project.`;
+    const ul = $("reclist");
+    ul.replaceChildren();
+    for (const it of rows) {
+      const r = recOf(it);
+      ul.append(el("li", { class: isPicked(it) ? "picked" : "" },
+        el("span", { class: "rn" }, el("a", { href: "#", text: it.name, onclick: (e) => { e.preventDefault(); focusItem(it.id); } }), ` → ${r.action} · ${SCOPE_LABEL[r.scope] || r.scope}`),
+        el("span", { class: "rs" }, `−${fmt(r.est_tokens)} `, el("button", { class: "rec" + (isPicked(it) ? " on" : ""), text: isPicked(it) ? "selected" : "select", onclick: () => { if (isPicked(it)) delete sel[it.id]; else pick(it); persist(); render(); } })),
+        el("span", { class: "rr", text: r.reason }),
+      ));
+    }
+    if (!rows.length) ul.append(el("li", {}, el("span", { class: "rr", text: "Nothing to recommend in this mode." })));
+    $("recall").disabled = !rows.length;
+  }
+  document.querySelectorAll(".modes button").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.mode; try { localStorage.setItem("mc:mode", mode); } catch (e) {} render(); }));
+  $("recall").addEventListener("click", () => { for (const it of recRows()) pick(it); persist(); render(); toast(`${recRows().length} ${mode} recommendations selected. Review the table, then copy the plan.`); });
+  $("recclear").addEventListener("click", () => { sel = {}; persist(); render(); });
 
   if (R.flags.length) {
     const ul = el("ul");
@@ -286,14 +378,14 @@ const REPORT = /*__REPORT_DATA__*/null;
   // ---- table ----
   const CHIPS = [
     ["actionable", "Actionable"], ["all", "All"], ["skill", "Skills"], ["plugin", "Plugins"], ["mcp", "MCP"],
-    ["fixed", "Built-in"], ["memory", "Memory"], ["agent", "Agents"], ["flagged", "Mismatches"], ["changed", "Selected"],
+    ["recommended", "Recommended"], ["fixed", "Built-in"], ["memory", "Memory"], ["agent", "Agents"], ["flagged", "Mismatches"], ["changed", "Selected"],
   ];
   const state = { chip: "actionable", q: "", cat: null, group: null, focus: null, sort: "tokens", dir: -1 };
   for (const [k, l] of CHIPS) $("chips").append(el("button", { class: "chip", "data-chip": k, text: l, onclick: () => { state.chip = k; state.cat = state.group = state.focus = null; render(); } }));
   $("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); renderRows(savedMap()); });
   document.querySelectorAll("th[data-sort]").forEach((th) => th.addEventListener("click", () => {
     const k = th.dataset.sort;
-    state.dir = state.sort === k ? -state.dir : (k === "tokens" ? -1 : 1);
+    state.dir = state.sort === k ? -state.dir : (k === "tokens" || k === "usage" ? -1 : 1);
     state.sort = k;
     renderRows(savedMap());
   }));
@@ -304,6 +396,7 @@ const REPORT = /*__REPORT_DATA__*/null;
     if (["skill", "plugin", "mcp", "memory", "agent"].includes(c) && it.kind !== c) return false;
     if (c === "fixed" && it.category !== "Built-in (fixed)") return false;
     if (c === "flagged" && !flagsBy[it.id]) return false;
+    if (c === "recommended" && !recOf(it)) return false;
     if (c === "changed" && !sel[it.id]) return false;
     if (state.cat && it.category !== state.cat) return false;
     if (state.group && it.group !== state.group) return false;
@@ -315,8 +408,9 @@ const REPORT = /*__REPORT_DATA__*/null;
   function renderRows(saved) {
     const tb = $("rows");
     tb.replaceChildren();
+    const sortVal = (i) => state.sort === "usage" ? (i.usage ? i.usage.all.model + i.usage.all.user : -1) : i[state.sort];
     const rows = items.filter(matches).sort((a, b) => {
-      const va = a[state.sort], vb = b[state.sort];
+      const va = sortVal(a), vb = sortVal(b);
       return (typeof va === "number" ? va - vb : String(va).localeCompare(String(vb))) * state.dir;
     });
     const maxTok = Math.max(1, ...items.map((i) => i.tokens));
@@ -330,8 +424,10 @@ const REPORT = /*__REPORT_DATA__*/null;
           it.turn > 1 ? el("span", { class: "later", title: "Arrived after turn 1 (connected late)", text: "late" }) : null),
         it.preview ? el("div", { class: "pv", text: it.preview }) : null,
         it.note ? el("div", { class: "note", text: it.note }) : null,
+        recOf(it) ? el("button", { class: "rec" + (isPicked(it) ? " on" : ""), title: recOf(it).reason, text: `${mode} → ${recOf(it).action} · ${SCOPE_LABEL[recOf(it).scope] || recOf(it).scope}`, onclick: () => { if (isPicked(it)) delete sel[it.id]; else pick(it); persist(); render(); } }) : null,
         pid && !it.actions.length ? el("button", { class: "link", text: "→ " + byId[pid].name + " plugin row", onclick: () => focusItem(pid) }) : null,
       );
+      const useCell = el("td", {}, usageText(it) || el("span", { class: "src", text: "—" }));
       const tokCell = el("td", { class: "num", title: it.rollup ? "Sum of its items, not counted twice in totals" : "" },
         fmt(it.tokens) + (it.rollup ? " Σ" : ""),
         el("div", { class: "bar" }, el("i", { style: `width:${Math.max(2, 100 * it.tokens / maxTok)}%;background:${it.rollup ? "var(--accent)" : color(it.category)}` })));
@@ -363,12 +459,13 @@ const REPORT = /*__REPORT_DATA__*/null;
         nameCell,
         el("td", { class: "src" }, it.category, el("br"), it.group),
         tokCell,
+        useCell,
         el("td", { class: "state", text: it.state || "on" }),
         actCell, scopeCell,
         el("td", { class: "num" + (sv ? " save" : ""), text: sv ? "−" + fmt(sv) : "" }),
       ));
     }
-    if (!rows.length) tb.append(el("tr", {}, el("td", { colspan: 7, class: "src", text: "Nothing matches this filter." })));
+    if (!rows.length) tb.append(el("tr", {}, el("td", { colspan: 8, class: "src", text: "Nothing matches this filter." })));
     document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.chip === state.chip && !state.cat));
     const f = [state.cat, state.group].filter(Boolean).join(" › ");
     $("fnote").replaceChildren(...(f ? ["Filtered to ", el("b", { text: f }), " ", el("button", { text: "clear", onclick: () => { state.cat = state.group = state.focus = null; render(); } })] : []));
@@ -379,16 +476,18 @@ const REPORT = /*__REPORT_DATA__*/null;
     const actions = Object.entries(sel).filter(([id, s]) => byId[id] && s.action).map(([id, s]) => {
       const it = byId[id];
       const a = { kind: it.kind, target: it.name, action: s.action, scope: s.scope, est_tokens: itemSaving(it, saved) };
+      if (isPicked(it)) a.recommended = mode;
       if (it.plugin_id) a.plugin_id = it.plugin_id;
       if (it.source) a.source = it.source;
       return a;
     });
-    return { manage_context_plan: 1, project: R.project, session_id: R.session_id, generated: R.generated, actions };
+    return { manage_context_plan: 1, project: R.project, session_id: R.session_id, generated: R.generated, mode: HAS_HIST ? mode : undefined, actions };
   }
 
   function render() {
     const saved = savedMap();
     cards(saved);
+    renderRecs();
     drawTreemap(saved);
     renderRows(saved);
     const p = plan(), total = sumSaved(saved);
@@ -427,7 +526,7 @@ const REPORT = /*__REPORT_DATA__*/null;
   let rz;
   window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => drawTreemap(savedMap()), 120); });
 
-  $("method").textContent = `Method: each item is sized by its characters in the session transcript and divided by one ratio (${R.chars_per_token} chars/token, ${R.calibrated ? "calibrated so turn-1 items add up to the real first-turn usage" : "default, because calibration was out of range; the residual is shown as Unattributed"}). The total is real; per-item numbers are estimates, since JSON tool schemas and prose tokenize differently. Changes apply from the next session. Transcript: ${R.transcript}.`;
+  $("method").textContent = `Method: each item is sized by its characters in the session transcript and divided by one ratio (${R.chars_per_token} chars/token, ${R.calibrated ? "calibrated so turn-1 items add up to the real first-turn usage" : "default, because calibration was out of range; the residual is shown as Unattributed"}). The total is real; per-item numbers are estimates, since JSON tool schemas and prose tokenize differently. Changes apply from the next session. Transcript: ${R.transcript}.${R.history ? ` Usage counts come from ${R.history.sessions.all} transcripts since ${R.history.since} (${R.history.sessions.here} in this project): Skill tool calls count as the model's, typed /slash commands and @mentions as yours. Rules: references/recommendations.md.` : " Usage history was not collected (--no-history)."}`;
   render();
 })();
 </script>

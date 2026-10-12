@@ -1,21 +1,27 @@
 ---
 name: manage-context
-version: 1.0.1
-description: Measure what fills a Claude Code session's context before any work (system prompt, tools, skills, plugins, MCP servers, memory files), render it as an interactive HTML treemap and table, and apply the per-item changes the user picks there (user-invocable only, off, disable plugin/MCP; global or this project) with a dry run and undo. Use when the user asks why the context is large, what uses tokens, or wants to slim skills, plugins or MCP servers.
+version: 1.1.0
+description: Measure what fills a Claude Code session's context before any work (system prompt, tools, skills, plugins, MCP servers, memory files), render it as an interactive HTML treemap and table, mine past transcripts for how often each item was actually used, and recommend what to convert to user-invocable-only or disable in a conservative (bear) or aggressive (bull) mode. Applies the per-item changes the user picks there (global or this project) with a dry run and undo. Use when the user asks why the context is large, what uses tokens, which skills are never used, or wants to slim skills, plugins or MCP servers.
 ---
 
 # Manage context
 
-Two scripts do the work. Don't edit config files by hand in this skill.
+Three scripts do the work. Don't edit config files by hand in this skill.
 
 - `scripts/scan.py` reads the session transcript, which records exactly what was
   injected, and maps each item to the setting that controls it. It writes
   `context-report.html` plus `context-report.json`.
+- `scripts/usage.py` (called by scan) mines all transcripts from the last 90 days
+  for how often each skill, MCP server and agent was used, by the model and by
+  the user. Scan turns that into a **bear** (conservative) and a **bull**
+  (aggressive) recommendation per item.
 - `scripts/apply_plan.py` turns the plan exported from the HTML into JSON edits.
   It dry-runs by default, and `--apply` writes backups plus an undo file.
 
 Read `references/levers.md` before explaining a mismatch or a rejected action.
 It records what each setting really does (e.g. plugin skills ignore `skillOverrides`).
+Read `references/recommendations.md` before explaining why something was or
+was not recommended.
 
 ## 1. Scan
 
@@ -34,11 +40,23 @@ python3 <skill-dir>/scripts/scan.py --project "$PWD" --out <scratchpad>/context-
   report leaves out the largest fixed items and is uncalibrated.
 - The report reflects config **at that session's start**. After a change, measure
   a new session.
+- Usage mining takes about a second per gigabyte of transcripts. `--history-days N`
+  widens or narrows the window; `--no-history` skips it. `--mode bull` opens the
+  page in bull mode (default bear). If the user said how aggressive to be
+  ("convert everything I don't use", "only the obvious ones"), pass the matching mode.
 
 Then open it (`open <path>` on macOS, `xdg-open` on Linux) and reply in chat with:
-the first-turn total, the 5 largest items, how much is actionable, and the top 3
-mismatches if there are any. Tell the user to pick actions in the page and press
-**Copy plan** (or **Download plan.json**), then paste it here.
+the first-turn total, the 5 largest items, how much is actionable, the top 3
+mismatches if there are any, and the two recommendation lines the script printed
+(bear: N changes / ~tokens, bull: N changes / ~tokens) with their top items.
+Tell the user to pick a mode in the page's **Recommendations** panel, press
+**Select all** or pick rows, adjust anything in the table, then **Copy plan** (or
+**Download plan.json**) and paste it here.
+
+Each recommendation carries a reason ("listed in 407 sessions, model never
+called it · you typed /name 12× (still works)"). Quote it when the user asks why.
+A skill the user types as `/name` is a good conversion: `user-invocable-only`
+keeps `/name` working and only hides it from the model.
 
 ## 2. Dry run
 
@@ -70,3 +88,8 @@ Undo works the same way: dry run first, then `--apply` after a yes.
   first-turn total. Say "~" and don't present them as exact.
 - An `"off"` that is still loaded is a **mismatch**, not a bug in the report.
   Explain which lever actually controls the item.
+- Recommendations are evidence from past transcripts, not a verdict. A skill
+  the model never called may still be wanted for a workflow that hasn't come up;
+  the user decides, and `user-invocable-only` is reversible (`On` in the table).
+- Usage counts are mined from transcript tool calls and typed commands only.
+  Never quote message text from other sessions.

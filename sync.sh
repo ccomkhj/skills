@@ -3,6 +3,13 @@
 # ~/.agents/skills (Codex, Gemini CLI, ...), one symlink per skill.
 # Idempotent: correct links are left alone, stale links are re-pointed,
 # real files/dirs are never clobbered (warned and skipped).
+
+# `sh sync.sh` ignores the shebang, so switch to Bash before using its syntax.
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
+# macOS /bin/sh is Bash running in POSIX mode, which disables process substitution.
+set +o posix
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
