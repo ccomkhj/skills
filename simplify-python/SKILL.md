@@ -13,6 +13,8 @@ Preserve return values, exception types and timing, side effects and their order
 
 ## Readability rules
 
+Tiebreaker: when two forms read equally well, prefer the one that is easier to change.
+
 - Use guard clauses for preconditions and `continue` for rejected loop items. Keep peer branches together when that reads better.
 - Remove dead code, redundant state, and intermediates that add no meaning. Keep explaining variables and names that express domain meaning or units.
 - Keep related calculations, explanations, and uses close without changing evaluation order, timing, lifetime, or scope.
