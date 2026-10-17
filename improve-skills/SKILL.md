@@ -1,7 +1,8 @@
 ---
 name: improve-skills
-version: 1.0.0
+version: 1.1.0
 description: Fold one lesson into one existing skill, behind a confirmation gate.
+argument-hint: "[skill | lesson | handoff-file F<n>]"
 disable-model-invocation: true
 ---
 
@@ -16,7 +17,7 @@ One skill per run. The single highest-value change, made well and confirmed, bea
 Gather candidate improvements from two sources:
 
 - **Session** — scan what happened this session for the moments a skill fell short: a correction you gave, friction the agent pushed through, a workaround it discovered, a mistake a skill should have prevented. Each is a candidate lesson.
-- **Direct** — if the invocation named a skill or a specific change, that is the lesson; take it as given (still confirm the target in Step 2).
+- **Direct** — if the invocation named a skill, a specific change, or a handoff file and finding (`<file> F3`, written by inspect-skill-flow or scan-sessions-and-learn), that is the lesson; take it as given (still confirm the target in Step 2).
 
 For each lesson capture three things: (a) what was learned, (b) which repo skill it belongs in, (c) why that skill is currently silent or wrong about it. A lesson with no home skill is out of scope — note it as "no target, maybe a new skill" and set it aside.
 
@@ -30,12 +31,12 @@ If the lessons cluster on a single skill, that is the target. If they span sever
 
 ## Step 3 — Draft the proposal
 
-Read `~/.agents/skills/writing-great-skills/SKILL.md` (and its `GLOSSARY.md` for any term you're unsure of), then design the concrete edit. In particular:
+Load the `writing-for-agents` skill (mattpocock-skills), then design the concrete edit. In particular:
 
 - **Place it right on the information hierarchy** — inline step/reference vs. a disclosed file — so the top doesn't bloat.
 - **Single source of truth** — change the meaning in one place; if it shifts what the skill triggers on, update the description too.
 - **No duplication, no no-ops** — prefer strengthening or introducing a leading word over restating something the skill already says or the model already does.
-- **Minimal and in-voice** — the smallest change that lands the lesson, in the skill's existing tone.
+- **Minimal and in-voice** — the smallest change that lands the lesson, in the skill's existing tone. Don't pad the skill: every added line costs attention on every run, so prefer rewording or replacing existing lines, and add new content only when the lesson can't land otherwise.
 
 **Completion:** a written proposal a reader could approve or amend *without seeing the file* — naming the target skill, the exact change (before→after or added/removed lines) and where it goes, and the lesson driving it.
 
