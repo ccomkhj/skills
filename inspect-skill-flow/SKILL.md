@@ -1,6 +1,6 @@
 ---
 name: inspect-skill-flow
-description: Graph a skill's flow — steps, artifacts, invocations — render it with draw-graphology, and report checkable weak links — each verified by two independent subagents — as a handoff file of lessons for improve-skills.
+description: Graph a skill's flow — steps, artifacts, invocations — render it with draw-graphology when installed, and report checkable weak links — each verified by two independent subagents — as a handoff file of lessons for improve-skills.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Read one or more skills, build a typed dependency graph of their flow, render it, and audit the graph for **weak links** — defects the graph can prove, each cited to an exact node or edge. Read-only: this skill never edits a skill; findings hand off to `/improve-skills`, which owns the edit-behind-a-gate.
 
-Rendering is delegated to `/draw-graphology` — build the graph JSON to its schema (`draw-graphology/references/graph-schema.md`) and let its mandatory render-view-fix loop produce the interactive HTML + preview PNG. Do not restate or reimplement its renderer here.
+Rendering is optional and delegated to `/draw-graphology` when it is installed — build the graph JSON to its schema (`draw-graphology/references/graph-schema.md`) and let its render-view-fix loop produce the interactive HTML + preview PNG. When it isn't installed, the graph JSON plus the report are the deliverable. Do not restate or reimplement a renderer here.
 
 ## Graph model
 
@@ -82,15 +82,15 @@ Fold the survivors back into the graph JSON: retype defective nodes to `weak`, m
 
 ## Step 5 — Render
 
-Invoke `/draw-graphology` on the graph JSON. It owns the render-view-fix loop; your acceptance bar for it: node labels legible, the three edge weights/labels distinguishable, red `weak`/`missing` nodes visible at a glance.
+If `/draw-graphology` is installed, invoke it on the graph JSON. It owns the render-view-fix loop; your acceptance bar for it: node labels legible, the three edge weights/labels distinguishable, red `weak`/`missing` nodes visible at a glance. If it isn't, skip rendering and say so in the report — the audit stands on the JSON alone.
 
-**Completion:** HTML + PNG produced, PNG viewed and legible, paths in hand.
+**Completion:** HTML + PNG produced, PNG viewed and legible, paths in hand — or rendering skipped and stated.
 
 ## Step 6 — Report and hand off
 
 Report, in this order:
 
-- The rendered graph: PNG shown, HTML path for interactive exploration.
+- The rendered graph: PNG shown, HTML path for interactive exploration — or the graph JSON path if rendering was skipped.
 - The flow in one paragraph: entry, main chain, where it ends.
 - Findings, most severe first, each as: check name · node/edge cited · **failure scenario** · one-line **lesson** phrased so it can be fed directly to `/improve-skills` (which takes one lesson per run; the rest queue).
 - Refuted findings last, one line each, with the refuting reason.

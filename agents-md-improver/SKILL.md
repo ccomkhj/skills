@@ -19,7 +19,7 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure Claude 
 Find all CLAUDE.md files in the repository:
 
 ```bash
-find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/dev/null | head -50
+find . -name "AGENTS.md" -o -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/dev/null | head -50
 ```
 
 **File Types & Locations:**
@@ -106,6 +106,7 @@ After outputting the quality report, ask user for confirmation before updating.
    - Package relationships that weren't clear
    - Testing approaches that work
    - Configuration quirks
+   - Findings handed in from a handoff file (`<file> F2`, e.g. from scan-sessions-and-learn) — verify each against the code and the current file first; a rule that already exists and keeps being broken needs sharper wording or a hook, not a duplicate line
 
 2. **Keep it minimal** - Avoid:
    - Restating what's obvious from the code
