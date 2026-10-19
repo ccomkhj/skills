@@ -526,7 +526,7 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
             plugin = None
             for v, lbl in (
                 ("name-only", "Name only"),
-                ("user-invocable-only", "User-invocable only"),
+                ("user-invocable-only", "User-invocable only (no model invocation)"),
                 ("off", "Off"),
             ):
                 actions.append(
