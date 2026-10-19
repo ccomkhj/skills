@@ -1,7 +1,7 @@
 ---
 name: scan-sessions-and-learn
 version: 1.6.0
-description: Retrospective over recent Claude Code sessions — find the workflows you repeat and where they stall, check each lesson against what your skills and AGENTS.md already say, and hand it to the one place that owns the fix (improve-skills, inspect-skill-flow, agents-md-improver, or a proposed edit). Proposes only; never edits. Looks at work habits, not beliefs (socrates) or context cost (manage-context).
+description: Retrospective over recent Claude Code sessions — find the workflows you repeat and where they stall, check each lesson against what your skills and AGENTS.md already say, and hand it to the one place that owns the fix (improve-skills, skill-flow, agents-md-improver, or a proposed edit). Proposes only; never edits. Looks at work habits, not beliefs (socrates) or context cost (manage-context).
 argument-hint: "[--days N | --sessions N] [--repo NAME|current]"
 disable-model-invocation: true
 ---

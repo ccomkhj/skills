@@ -1,10 +1,10 @@
 ---
-name: inspect-skill-flow
+name: skill-flow
 description: Graph a skill's flow — steps, artifacts, invocations — render it with draw-graphology when installed, and report checkable weak links — each verified by two independent subagents — as a handoff file of lessons for improve-skills.
 disable-model-invocation: true
 ---
 
-# inspect-skill-flow
+# skill-flow
 
 Read one or more skills, build a typed dependency graph of their flow, render it, and audit the graph for **weak links** — defects the graph can prove, each cited to an exact node or edge. Read-only: this skill never edits a skill; findings hand off to `/improve-skills`, which owns the edit-behind-a-gate.
 

@@ -5,7 +5,7 @@ Route by where the fix lives, not by what the finding is about. The digest's ski
 | Finding | Sink | Run line |
 |---|---|---|
 | An `own` skill fell short, or misses a step the user keeps adding by hand | improve-skills | `/improve-skills <handoff> F<n>` |
-| A chain of `own` skills breaks between steps: a step consumes what the previous never produces, or ends without naming the next | inspect-skill-flow to audit, then improve-skills | `/inspect-skill-flow <skill> …` |
+| A chain of `own` skills breaks between steps: a step consumes what the previous never produces, or ends without naming the next | skill-flow to audit, then improve-skills | `/skill-flow <skill> …` |
 | A repo rule is missing, or written down and still broken | agents-md-improver, in a session in that repo | `/agents-md-improver <handoff> F<n>` |
 | A `repo` skill (in a project's `.claude/skills`) falls short | an edit in that repo, in a session there | proposed diff |
 | A `plugin`/`user`/`other` skill falls short | a wrapper skill in this repo, or a line in `~/.claude/CLAUDE.md` | proposed diff |

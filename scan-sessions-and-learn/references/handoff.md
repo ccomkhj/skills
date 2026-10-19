@@ -14,7 +14,7 @@ Header: date and time of this run; scope (window, sessions kept, repos, date ran
 - F<n> — <title>: applied | stale (<what you checked>, <date>)   ← pending ones keep their full block below
 
 ## F1 — <title>
-- sink: improve-skills | inspect-skill-flow | agents-md-improver | new skill | ~/.claude/CLAUDE.md | hook | config | memory
+- sink: improve-skills | skill-flow | agents-md-improver | new skill | ~/.claude/CLAUDE.md | hook | config | memory
 - target: <exact path, or settings key>
 - target status: missing | ignored (<file:line of the existing rule>) | pending since <date first proposed>
 - evidence: <k> sessions, <d> days, <r> repos — <id prefix + date: what happened, paraphrased>

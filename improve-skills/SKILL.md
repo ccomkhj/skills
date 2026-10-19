@@ -17,7 +17,7 @@ One skill per run. The single highest-value change, made well and confirmed, bea
 Gather candidate improvements from two sources:
 
 - **Session** — scan what happened this session for the moments a skill fell short: a correction you gave, friction the agent pushed through, a workaround it discovered, a mistake a skill should have prevented. Each is a candidate lesson.
-- **Direct** — if the invocation named a skill, a specific change, or a handoff file and finding (`<file> F3`, written by inspect-skill-flow or scan-sessions-and-learn), that is the lesson; take it as given (still confirm the target in Step 2).
+- **Direct** — if the invocation named a skill, a specific change, or a handoff file and finding (`<file> F3`, written by skill-flow or scan-sessions-and-learn), that is the lesson; take it as given (still confirm the target in Step 2).
 
 For each lesson capture three things: (a) what was learned, (b) which repo skill it belongs in, (c) why that skill is currently silent or wrong about it. A lesson with no home skill is out of scope — note it as "no target, maybe a new skill" and set it aside.
 
