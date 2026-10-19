@@ -1,7 +1,8 @@
 # Context levers: what each setting really does
 
 Verified against the Claude Code CLI 2.1.295 binary on 2026-10-09 (setting
-schema descriptions and the skill-state resolver). Re-check after a major CLI
+schema descriptions and the skill-state resolver); plugin-skill rules re-checked
+on 2.1.303 (2026-10-19). Re-check after a major CLI
 upgrade: `strings "$(readlink -f "$(which claude)")" | grep -o 'skillOverrides:()=>.\{400\}'`.
 
 ## Settings files and precedence
@@ -27,8 +28,12 @@ is why `apply_plan.py` re-reads it right before an atomic write.
 - `off`: hidden from both.
 - Absent means `on`.
 - **Plugin skills (`plugin:skill`) ignore `skillOverrides`.** The resolver returns
-  `on` for any skill whose source is a plugin. The only switch is the plugin itself.
-  The scanner flags any override on a plugin skill as a mismatch.
+  `on` for any skill whose source is a plugin. The scanner flags any override on a
+  plugin skill as a mismatch. Two levers remain: disable the whole plugin, or add
+  `disable-model-invocation: true` to that skill's own `SKILL.md` frontmatter (the
+  plugin loader honours it). The frontmatter edit is outside this skill's scripts
+  and is lost when the plugin updates or its owning app re-syncs, so offer it only
+  as a manual step.
 - `disableBundledSkills: true` removes all bundled skills at once. That's too blunt
   to offer per row, so it's mentioned here only.
 
@@ -44,7 +49,9 @@ is why `apply_plan.py` re-reads it right before an atomic write.
   claude.ai knowledge-work plugins) are not unloaded by a local `false`. Manage
   them on claude.ai. The scanner flags this.
 - **Skills-dir plugins** (a folder with `plugin.json` inside `~/.claude/skills/`,
-  e.g. one installed by another app) have no setting. They're report-only.
+  e.g. one installed by another app) have no setting. They're report-only here;
+  manually, use the frontmatter edit above or move the folder out of
+  `~/.claude/skills/` (the owning app may restore it).
 - Plugins not found locally at all (e.g. `anthropic-skills:*`) come from the
   claude.ai account. They're report-only.
 

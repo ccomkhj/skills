@@ -1,6 +1,6 @@
 ---
 name: manage-context
-version: 1.2.0
+version: 1.2.1
 disable-model-invocation: true
 description: Measure what fills a session's starting context (skills, plugins, MCP servers, built-in tools, memory files), see how often each was used, and convert unused ones to user-invocable-only or disable them, with a dry run and undo.
 ---
