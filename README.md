@@ -88,6 +88,7 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 |-------|---------|-------------|--------|
 | [excalidraw-diagram](./excalidraw-diagram) | 1.0.0 | Create Excalidraw diagram JSON files that make visual arguments — hand-placed conceptual diagrams | Improved from [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 | [loom-transcript](./loom-transcript) | 1.0.0 | Fetch a public Loom video's transcript from its share link (oEmbed + share-page scrape, stdlib Python, no auth) and summarize it. User-invoked: `/loom-transcript <url>` | — |
+| [local-artifact](./local-artifact) | 1.0.0 | User-invoked replacement for the built-in `Artifact` tool, which is denied in `permissions.deny` because it costs thousands of tokens in every session. It builds an HTML page under the same page contract (2–4 word title, `:root` color tokens with dark mode, CDN allowlist with pinned versions, phone-width layout, ≤16 MB). `scripts/gallery.py` keeps the pages in a local gallery (`~/.local/share/local-artifacts/<slug>/`) and can `publish` (which runs the contract checks and opens the page), `list`, `open` and `delete` them. Updating a slug keeps its `file://` link. A **Copy as JSON** button stands in for the hosted runtime when a page has to collect input. Zero context cost until you type `/local-artifact` | — |
 
 ## Install
 
