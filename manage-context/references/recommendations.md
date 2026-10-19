@@ -11,6 +11,7 @@ the transcripts.
 | skill | `Skill` tool calls (the model chose it) | typed `/name` (`<command-name>`) and `@` skill mentions | sessions whose skill listing included it |
 | MCP server | tool calls with the `mcp__<server>__` prefix | — | sessions whose deferred tool names included the server |
 | agent type | `Agent` calls with that `subagent_type` | — | — |
+| built-in tool | calls by tool name | — | — (every session loads it, so the total session count) |
 | plugin (roll-up) | sum of its members | sum of its members | max of its members |
 
 Each signal is kept twice: **all** projects, and **here** (transcripts whose
@@ -31,7 +32,8 @@ Thresholds live at the top of `scan.py` (`EVIDENCE`, `BULL_STALE_DAYS`,
 Only items with no model use at all, and enough evidence (listed in ≥ 5 sessions):
 
 - skill → `user-invocable-only` when the model never called it in the window
-- MCP server / plugin → `disable` when it had zero calls in every session that loaded it
+- MCP server / plugin / built-in tool → `disable` when it had zero calls in every session that loaded it
+  (a tool is disabled with `permissions.deny`)
 
 ### Bull (aggressive)
 
@@ -58,7 +60,8 @@ Evidence threshold drops to 2 sessions. Everything bear recommends, plus:
 
 - plugin skills (`plugin:skill`): `skillOverrides` ignores them, so only the plugin row can act
 - skills that already have an override, or are listed name-only (≈ 2 tokens)
-- anything with no switch: built-ins, agents, memory files, org-synced plugins
+- `CORE_TOOLS`, which the session can't work without
+- anything with no switch: system prompt, agents, memory files, org-synced plugins
 - items listed in fewer sessions than the mode's evidence threshold (too new to judge)
 
 ## Caveats
@@ -68,4 +71,6 @@ Evidence threshold drops to 2 sessions. Everything bear recommends, plus:
   reverting an override.
 - "Listed" for MCP servers comes from deferred tool names; a server with no
   tools (instructions only) falls back to the total session count.
+- A tool added by a recent CLI release has fewer real sessions than the count
+  suggests, since the total session count is used as its "listed".
 - The window is by event timestamp; transcripts older than the window are skipped by mtime.

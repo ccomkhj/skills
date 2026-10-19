@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mine Claude Code transcripts for how often each skill, MCP server and agent was used.
+"""Mine Claude Code transcripts for how often each skill, MCP server, agent and built-in tool was used.
 
 Reads every ~/.claude/projects/*/*.jsonl within a day window and counts:
 
@@ -8,6 +8,7 @@ Reads every ~/.claude/projects/*/*.jsonl within a day window and counts:
 - MCP servers: tool calls per server prefix (``mcp__<prefix>__<tool>``) and
   the sessions that loaded the server (its deferred tool names appeared)
 - agents: Agent tool calls per subagent type
+- tools: calls per built-in tool name (every session loads them, so no "listed")
 
 Counts only. No prompt, message or tool-input text is copied out.
 
@@ -28,6 +29,7 @@ MARKERS = (
     '"name":"Skill"',
     '"name":"mcp__',
     '"name":"Agent"',
+    '"type":"tool_use"',
     "<command-name>",
     '"skill_mention"',
     '"skill_listing"',
@@ -91,6 +93,7 @@ def collect(days: int, project: Path, root: Path = PROJECTS) -> dict:
     skills: dict[str, dict[str, Stat]] = {}
     mcp: dict[str, dict[str, Stat]] = {}
     agents: dict[str, dict[str, Stat]] = {}
+    tools: dict[str, dict[str, Stat]] = {}
     sessions: dict[str, set[str]] = {"all": set(), "here": set()}
 
     def stat(store, name, scope) -> Stat:
@@ -170,6 +173,9 @@ def collect(days: int, project: Path, root: Path = PROJECTS) -> dict:
                     elif name == "Agent" and inp.get("subagent_type"):
                         for s in scopes:
                             stat(agents, inp["subagent_type"], s).hit("model", sid, ts)
+                    if name and not name.startswith("mcp__"):
+                        for s in scopes:
+                            stat(tools, name, s).hit("model", sid, ts)
 
     def export(store):
         return {
@@ -183,6 +189,7 @@ def collect(days: int, project: Path, root: Path = PROJECTS) -> dict:
         "skills": export(skills),
         "mcp": export(mcp),
         "agents": export(agents),
+        "tools": export(tools),
     }
 
 

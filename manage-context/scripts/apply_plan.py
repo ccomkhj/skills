@@ -40,6 +40,7 @@ class _Absent:
 ABSENT = _Absent()
 
 SKILL_STATES = {"on", "name-only", "user-invocable-only", "off"}
+CORE_TOOLS = {"Bash", "Read", "Edit", "Write", "Skill", "ToolSearch"}  # keep in sync with scan.py
 NAME_RE = re.compile(r"^[\w.:@ /-]{1,200}$")
 
 
@@ -144,6 +145,20 @@ def compile_action(a: dict, project: Path) -> tuple[list[dict], list[str]]:
             f"mcp {target}: no {scope} switch for a {a.get('source')} server "
             "(claude.ai: disconnect on claude.ai; plugin: disable the plugin)"
         )
+
+    if kind == "tool":
+        # A bare tool name in permissions.deny drops the tool from the model's list.
+        if action not in ("disable", "enable") or scope not in ("global", "project"):
+            raise ValueError(f"tool {target}: unsupported {action}/{scope}")
+        if target in CORE_TOOLS or target.startswith("mcp__") or "(" in target:
+            raise ValueError(f"tool {target}: not deniable here")
+        f = settings_file(scope, project)
+        add = "list_add" if action == "disable" else "list_remove"
+        if action == "enable":
+            for layer in (CLAUDE_DIR / "settings.json", project / ".claude" / "settings.json"):
+                if layer != f and target in (get(load(layer), ["permissions", "deny"]) or []):
+                    warn.append(f"{tilde(layer)} also denies {target}; deny rules from any layer apply")
+        return [edit(f, ["permissions", "deny"], add, target)], warn
 
     raise ValueError(f"unsupported kind: {kind!r}")
 

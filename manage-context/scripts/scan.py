@@ -15,8 +15,8 @@ Writes <out>/context-report.html and <out>/context-report.json; prints a summary
 Never copies memory-file contents, session context or MCP config values into
 the report: only names, paths, sizes and short skill/tool description previews.
 
-Usage history (scripts/usage.py) counts how often each skill, MCP server and
-agent was used across all transcripts in the window, and each item gets a
+Usage history (scripts/usage.py) counts how often each skill, MCP server,
+agent and built-in tool was used across all transcripts in the window, and each item gets a
 recommendation in two modes: bear (convert only what the model never uses)
 and bull (convert everything the model does not use regularly). The rules
 are in references/recommendations.md.
@@ -50,6 +50,8 @@ EVIDENCE = {"bear": 5, "bull": 2}  # sessions that listed the item before judgin
 BULL_STALE_DAYS = 30  # bull: a model call older than this does not count as regular use
 BULL_RARE_RATE = 0.05  # bull: model sessions / listed sessions below this -> name-only
 UIO = "user-invocable-only"
+# Never offered for a deny: the session (and this skill) cannot work without them.
+CORE_TOOLS = {"Bash", "Read", "Edit", "Write", "Skill", "ToolSearch"}
 
 
 # ---------- small helpers ----------
@@ -124,6 +126,15 @@ class Config:
             "project": project / ".claude" / "skills",
             "personal": CLAUDE_DIR / "skills",
         }
+
+    def denied_tools(self) -> dict[str, str]:
+        """Whole-tool deny rules (a bare name, no pattern) and the layer that set each."""
+        out = {}
+        for layer, s in self.settings.items():
+            for rule in (s.get("permissions") or {}).get("deny") or []:
+                if isinstance(rule, str) and "(" not in rule:
+                    out[rule] = layer
+        return out
 
     def merged(self, key: str) -> dict:
         """Per-key effective value and the layer that set it."""
@@ -364,15 +375,31 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
             chars=sum(map(len, sp)) + len(snap.get("cliPrefix") or ""),
             preview=preview(sp[0]),
         )
+    denied = cfg.denied_tools()
     for tool in snap.get("tools") or []:
-        add(
+        name = tool["name"]
+        actions = []
+        if name not in CORE_TOOLS and not name.startswith("mcp__"):
+            actions.append(
+                {"value": "disable", "label": "Deny (remove tool)", "scopes": ["global", "project"]}
+            )
+        it = add(
             kind="tool",
-            name=tool["name"],
-            category="Built-in (fixed)",
+            name=name,
+            category="Built-in tools",
             group="Tool definitions",
             chars=len(json.dumps(tool.get("schema") or tool, ensure_ascii=False)),
             preview=preview(tool.get("description") or ""),
+            actions=actions,
+            note="Needed by this session; not offered." if name in CORE_TOOLS else "",
         )
+        if name in denied:
+            flags.append(
+                {
+                    "item": it["id"],
+                    "text": f"{name} is in permissions.deny ({denied[name]}) but still loaded.",
+                }
+            )
 
     # MCP servers: deferred names + instructions + eagerly surfaced definitions
     servers = set(tr["mcp_names"]) | cfg.user_mcp | cfg.local_mcp | cfg.mcpjson
@@ -733,6 +760,8 @@ def attach_usage(items: list[dict], history: dict, servers: set[str], cfg: Confi
             i["usage"] = _u(mcp_hist, "mcp", i["name"])
         elif i["kind"] == "agent":
             i["usage"] = _u(history, "agents", i["name"])
+        elif i["kind"] == "tool":
+            i["usage"] = _u(history, "tools", i["name"])
     for p in items:
         if not p["rollup"]:
             continue
@@ -808,7 +837,7 @@ def recommend(it: dict, history: dict, mode: str) -> dict | None:
         return None
     scopes = acts["disable"]
     glob = "global" if "global" in scopes else "project"
-    label = "calls" if it["kind"] == "mcp" else "uses"
+    label = "calls" if it["kind"] in ("mcp", "tool") else "uses"
     total_all = A["model"] + A["user"]
     total_here = H["model"] + H["user"]
     # sessions that loaded the item; plugins fall back to all sessions
@@ -817,8 +846,9 @@ def recommend(it: dict, history: dict, mode: str) -> dict | None:
     if loaded_all < need:
         return None
     if total_all == 0:
-        return _rec("disable", glob, it["tokens"],
-                    f"0 {label} in the {loaded_all} sessions that loaded it over {days} days")
+        # built-in tools have no per-session listing, so loaded_all is every session
+        seen = f"{loaded_all} sessions" if it["kind"] == "tool" else f"the {loaded_all} sessions that loaded it"
+        return _rec("disable", glob, it["tokens"], f"0 {label} in {seen} over {days} days")
     if mode == "bear":
         return None
     if total_here == 0 and loaded_here >= need and "project" in scopes:

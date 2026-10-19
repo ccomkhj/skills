@@ -1,8 +1,8 @@
 ---
 name: manage-context
-version: 1.1.1
+version: 1.2.0
 disable-model-invocation: true
-description: Measure what fills a session's starting context (skills, plugins, MCP servers, memory files), see how often each was used, and convert unused ones to user-invocable-only or disable them, with a dry run and undo.
+description: Measure what fills a session's starting context (skills, plugins, MCP servers, built-in tools, memory files), see how often each was used, and convert unused ones to user-invocable-only or disable them, with a dry run and undo.
 ---
 
 # Manage context
@@ -20,7 +20,8 @@ Three scripts do the work. Don't edit config files by hand in this skill.
   It dry-runs by default, and `--apply` writes backups plus an undo file.
 
 Read `references/levers.md` before explaining a mismatch or a rejected action.
-It records what each setting really does (e.g. plugin skills ignore `skillOverrides`).
+It records what each setting really does (e.g. plugin skills ignore `skillOverrides`,
+and a built-in tool is removed only by a bare name in `permissions.deny`).
 Read `references/recommendations.md` before explaining why something was or
 was not recommended.
 

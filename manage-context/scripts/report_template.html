@@ -248,7 +248,7 @@ const REPORT = /*__REPORT_DATA__*/null;
     if (!u) return null;
     const a = u.all, h = u.here;
     const parts = [];
-    if (it.kind === "mcp" || it.kind === "agent") parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " calls"));
+    if (["mcp", "agent", "tool"].includes(it.kind)) parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " calls"));
     else { parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " model")); parts.push(el("span", {}, el("b", { text: fmt(a.user) }), " you")); }
     const last = [a.last_model, a.last_user].filter(Boolean).sort().pop();
     const title = `All projects: ${a.model} model · ${a.user} you${a.listed ? ` · loaded in ${a.listed} sessions` : ""}\nThis project: ${h.model} model · ${h.user} you${h.listed ? ` · loaded in ${h.listed}` : ""}${last ? `\nLast used ${last}` : ""}`;
@@ -296,8 +296,8 @@ const REPORT = /*__REPORT_DATA__*/null;
     $("recsum").replaceChildren(el("b", { text: `${mode === "bear" ? "Bear" : "Bull"}: ${rows.length} change${rows.length === 1 ? "" : "s"}` }),
       ` · saves ~${fmt(total)} tokens (${Math.round(100 * total / baseline)}%)` + (picked ? ` · ${picked} selected` : ""));
     $("rechelp").textContent = mode === "bear"
-      ? `Conservative. Skills the model never called in ${R.history.days} days become user-invocable only (your /slash still works). MCP servers and plugins with zero use anywhere are disabled.`
-      : `Aggressive. Also converts skills the model called once, not in ${R.history.days} days of this project, or in under 5% of sessions (name-only), and disables servers and plugins unused in this project.`;
+      ? `Conservative. Skills the model never called in ${R.history.days} days become user-invocable only (your /slash still works). MCP servers, plugins and built-in tools with zero use anywhere are disabled (tools via permissions.deny).`
+      : `Aggressive. Also converts skills the model called once, not in ${R.history.days} days of this project, or in under 5% of sessions (name-only), and disables servers, plugins and tools unused in this project.`;
     const ul = $("reclist");
     ul.replaceChildren();
     for (const it of rows) {
@@ -394,7 +394,7 @@ const REPORT = /*__REPORT_DATA__*/null;
     const c = state.chip;
     if (c === "actionable" && !controllable(it) && !(it.rollup && it.actions.length)) return false;
     if (["skill", "plugin", "mcp", "memory", "agent"].includes(c) && it.kind !== c) return false;
-    if (c === "fixed" && it.category !== "Built-in (fixed)") return false;
+    if (c === "fixed" && !it.category.startsWith("Built-in")) return false;
     if (c === "flagged" && !flagsBy[it.id]) return false;
     if (c === "recommended" && !recOf(it)) return false;
     if (c === "changed" && !sel[it.id]) return false;

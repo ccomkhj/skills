@@ -64,9 +64,22 @@ is why `apply_plan.py` re-reads it right before an atomic write.
 - Deferred MCP tools cost only their name in the prompt (about 10 tokens each).
   Server instructions and tools surfaced eagerly cost their full text.
 
+## Built-in tools: `permissions.deny`
+
+`permissions: { deny: ["Artifact", ...] }`
+
+- A bare tool name (no `(pattern)`) drops the tool from the model's tool list,
+  so its whole schema leaves the prompt (`filterToolsByDenyRules`, CLI 2.1.303).
+  `Bash(rm:*)`-style rules only block calls; the schema stays.
+- Deny rules from every layer apply, so a global deny can't be undone by a
+  project file. To deny in one repo only, use `.claude/settings.local.json`.
+- Denying removes the capability, not just the listing: a skill that relies on
+  the tool (e.g. `ReportFindings` for code review, `ScheduleWakeup` for `/loop`) stops working.
+- `Bash`, `Read`, `Edit`, `Write`, `Skill`, `ToolSearch` are never offered (`CORE_TOOLS`).
+- Built-in deferred tool names cost about 10 tokens each; not offered per row.
+
 ## Not switchable
 
-These are fixed for a given CLI version and session: the system prompt, built-in tool
-schemas (e.g. `Artifact`), built-in deferred tool names, the built-in agent
-types, session context (git status, user email) and harness reminders. Memory
+These are fixed for a given CLI version and session: the system prompt, the
+built-in agent types, session context (git status, user email) and harness reminders. Memory
 files (`CLAUDE.md`, `AGENTS.md`, `@imports`) can only be trimmed by editing them.
