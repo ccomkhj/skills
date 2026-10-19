@@ -1,7 +1,8 @@
 ---
 name: manage-context
-version: 1.1.0
-description: Measure what fills a Claude Code session's context before any work (system prompt, tools, skills, plugins, MCP servers, memory files), render it as an interactive HTML treemap and table, mine past transcripts for how often each item was actually used, and recommend what to convert to user-invocable-only or disable in a conservative (bear) or aggressive (bull) mode. Applies the per-item changes the user picks there (global or this project) with a dry run and undo. Use when the user asks why the context is large, what uses tokens, which skills are never used, or wants to slim skills, plugins or MCP servers.
+version: 1.1.1
+disable-model-invocation: true
+description: Measure what fills a session's starting context (skills, plugins, MCP servers, memory files), see how often each was used, and convert unused ones to user-invocable-only or disable them, with a dry run and undo.
 ---
 
 # Manage context
