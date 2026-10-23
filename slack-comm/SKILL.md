@@ -1,6 +1,6 @@
 ---
 name: slack-comm
-description: Summarize the CURRENT Claude session's work into a concise, evidence-driven IMPACT/CAUSE/FIX Slack report (who was affected, what caused it, what was done) and stage it directly as a native Slack draft — DM to Huijo by default; the draft is the review surface, the user edits and sends in Slack. User-invoked mid-session (`/slack-comm`) when you need to report what you just did in a tight, matter-of-fact format. Not for org-scale newsletters or pulling other people's updates.
+description: Stage this session's work as a Slack draft: an IMPACT/CAUSE/FIX report or a request to a colleague.
 argument-hint: "[team name override]"
 disable-model-invocation: true
 ---
@@ -104,6 +104,28 @@ For pure feature/ship work with no defect, keep the same four headers and
 reframe: **IMPACT** = what the change enables and for whom, **CAUSE** = why it
 was needed (the gap or request driving it), **FIX** = what shipped. Drop
 **NOT AN ISSUE**.
+
+### Requests
+
+When the session ends on something a colleague must do (review a PR, make a
+decision, run a check), replace the four headers with a short ask:
+
+```
+@[colleague] Could you [ask]: [link] ([personal context])
+[when you need it, e.g. "Not urgent, anytime you have time. but please today 🙏"]
+
+*Why it's needed:*
+[the gap, one line]
+
+*What's updated:*   ← or *What I need:* when nothing changed
+[one point per line]
+-> *[what they must decide or update later]*
+```
+
+- Open with the ask and the @-mention; the ticket ID can stay out.
+- Say when you need it.
+- Give each point its own line.
+- Mark each part they must act on with `-> *…*` right after it.
 
 ## Common comms traps
 
