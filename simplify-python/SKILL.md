@@ -13,14 +13,15 @@ Preserve return values, exception types and timing, side effects and their order
 
 ## Readability rules
 
-Tiebreaker: when two forms read equally well, prefer the one that is easier to change.
+Tiebreaker (Reversibility): when two forms read equally well, prefer the one that is easier to change; cleanup should not lock in choices that are currently cheap to revisit.
 
 - Use guard clauses for preconditions and `continue` for rejected loop items. Keep peer branches together when that reads better.
 - Remove dead code, redundant state, and intermediates that add no meaning. Keep explaining variables and names that express domain meaning or units.
 - Keep related calculations, explanations, and uses close without changing evaluation order, timing, lifetime, or scope.
 - Extract a helper when its name exposes a meaningful step and saves more effort than the indirection costs. Avoid helpers requiring tangled state or vague names.
 - Inline thin, single-use helpers only when they provide no domain meaning, public interface, test seam, or extension point.
-- Deduplicate shared knowledge that changes together, not merely similar-looking code. Counts and nesting depth are review signals, not targets.
+- Don't Repeat Yourself (DRY): deduplicate shared knowledge that changes together, not merely similar-looking code. Counts and nesting depth are review signals, not targets.
+- Orthogonality: do not couple independent parts through a shared helper, flag, or state, so a change to one does not ripple into the others. When DRY and Orthogonality conflict, keep unrelated code separate.
 - Simplify boolean expressions only when easier to read; do not mechanically push negations inward.
 
 ## Python idioms
