@@ -14,7 +14,7 @@ the same job but loads only when you invoke it. Pages go to a local gallery
 (`~/.local/share/local-artifacts/<slug>/`, override with `LOCAL_ARTIFACTS_DIR`)
 instead of claude.ai.
 
-`scripts/gallery.py` keeps the gallery: `publish`, `list`, `open`, `delete`.
+`scripts/gallery.py` keeps the gallery: `publish`, `list`, `open`, `link`, `delete`.
 Run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/gallery.py --help` for flags.
 
 ## Build or update a page
@@ -35,6 +35,11 @@ Run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/gallery.py --help` for flags.
    ```
    claude "Read <page> and publish it as an Artifact. Reply with only the artifact URL." --setting-sources project,local --tools Artifact,Read
    ```
+
+   If the page's `meta.json` has `artifact_url`, suggest the update form instead
+   (prompt: `"Read the Artifact at <url>, then publish <page> to it with url=<url>. Reply with only the artifact URL."`).
+   A new session must pass `url`, or it creates a separate artifact, and it must read the artifact first, or the publish is refused.
+   When the user pastes back a new URL, run `link <slug> <url>`.
 
    This is the only place the Artifact tool still exists. Skipping user settings
    drops the deny for that one session, and the user approves the publish there.

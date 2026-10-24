@@ -135,6 +135,16 @@ def cmd_open(a):
     open_path(page)
 
 
+def cmd_link(a):
+    d = ROOT / a.slug
+    if not (d / "index.html").is_file():
+        sys.exit(f"✗ no page {a.slug!r}")
+    meta = load_meta(d)
+    meta["artifact_url"] = a.url
+    (d / "meta.json").write_text(json.dumps(meta, indent=2))
+    print(f"linked {a.slug} → {a.url}")
+
+
 def cmd_delete(a):
     d = ROOT / a.slug
     if not (d / "index.html").is_file():
@@ -160,6 +170,10 @@ def main():
     s = sub.add_parser("open", help="open a page in the browser")
     s.add_argument("slug")
     s.set_defaults(fn=cmd_open)
+    s = sub.add_parser("link", help="remember the claude.ai artifact URL of a page")
+    s.add_argument("slug")
+    s.add_argument("url")
+    s.set_defaults(fn=cmd_link)
     s = sub.add_parser("delete", help="remove a page permanently")
     s.add_argument("slug")
     s.add_argument("--yes", action="store_true")
