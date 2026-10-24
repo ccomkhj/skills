@@ -1,6 +1,6 @@
 ---
 name: ai-tutorial
-version: 1.1.0
+version: 1.1.1
 description: Teach one AI, ML or science concept as an interactive HTML tutorial page in the local-artifact gallery.
 argument-hint: "<concept>"
 disable-model-invocation: true
@@ -29,6 +29,9 @@ noise to an expert.
   evidence needed, and decision with its trade-offs. Include a case where an assumption
   breaks and the obvious solution fails. Ask the reader to diagnose or choose before
   revealing the analysis.
+- **Diagram logical flows.** When a concept involves a sequence, branching decision,
+  or feedback loop, include a diagram with labeled steps and arrows. Explain what
+  moves between steps and why.
 - **Anchor to the session.** If the concept came up in the user's code, paper or error,
   use that as the example. They already care about it.
 - **Cite primary sources, label analogies.** ML has folklore that outlived its paper.
