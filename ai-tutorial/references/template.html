@@ -7,6 +7,8 @@
   page contract allows stylesheets only from Google Fonts. SVG output needs no
   fonts, and raw TeX stays readable if the CDN is unreachable. Inline $…$,
   display $$…$$. After inserting math from JS, call MathJax.typesetPromise([el]).
+  Figure CSS targets direct-child svg only: MathJax output is also <svg>, so a bare
+  "figure svg" selector resizes math in captions.
 -->
 <html lang="en">
 <head>
@@ -89,9 +91,9 @@
   details.transfer { border-color: var(--accent); }
 
   figure.viz { margin: 16px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
-  figure.viz svg { width: 100%; height: auto; display: block; }
-  figure.viz svg text { fill: var(--muted); font-size: 12px; }
-  figure.viz svg .axis { stroke: var(--line); }
+  figure.viz > svg { width: 100%; height: auto; display: block; }
+  figure.viz > svg text { fill: var(--muted); font-size: 12px; }
+  figure.viz > svg .axis { stroke: var(--line); }
   .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: .93rem; }
   .controls input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
   .controls output { font-family: ui-monospace, Menlo, monospace; min-width: 4ch; }
