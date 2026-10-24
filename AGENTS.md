@@ -11,3 +11,5 @@
 
 - **Agent is smart* each skill doesn't need to elaborate WHAT to do but you focus on WHY it is needed.
 If you want to provide reference or template, use `/references` or `/scripts`, do not write lenghty content inside SKILL.md
+
+- Write a compact skill, do not elaborate details but focus on WHY and core concepts.
