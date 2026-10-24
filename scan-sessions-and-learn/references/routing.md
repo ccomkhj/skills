@@ -9,7 +9,7 @@ Route by where the fix lives, not by what the finding is about. The digest's ski
 | A repo rule is missing, or written down and still broken | agents-md-improver, in a session in that repo | `/agents-md-improver <handoff> F<n>` |
 | A `repo` skill (in a project's `.claude/skills`) falls short | an edit in that repo, in a session there | proposed diff |
 | A `plugin`/`user`/`other` skill falls short | a wrapper skill in this repo, or a line in `~/.claude/CLAUDE.md` | proposed diff |
-| A routine the user spells out again and again that no skill covers | new skill via skill-creator | proposed outline |
+| A routine the user spells out again and again that no skill covers | new skill via skill-creator | proposed outline per [new-skill.md](new-skill.md) |
 | A preference that holds across repos | `~/.claude/CLAUDE.md` | proposed diff |
 | A written rule that keeps being broken | hook (`~/.claude/settings.json` or the repo's `.claude/settings.json`) | proposed hook |
 | A tool or MCP server that keeps failing the same way | its config | proposed change |

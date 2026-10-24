@@ -5,10 +5,10 @@ Prints a compact, redacted text digest to stdout and never writes a file:
 a summary (selection, skills, recurring flows and phrases, friction) and one
 block per session. Headless (`claude -p`/SDK) runs, scratchpad sessions,
 sessions only reopened in the window, this session and earlier runs of this
-skill are left out. `--grep`/`--errors` instead print the typed prompts, tool
+skill are left out, and with --min-turns so are sessions with fewer typed prompts. `--grep`/`--errors` instead print the typed prompts, tool
 results and Claude replies that match, redacted.
 
-    scan.py [--days 7 | --sessions N] [--repo NAME|current]
+    scan.py [--days 7 | --sessions N] [--repo NAME|current] [--min-turns N]
             [--part all|summary|sessions] [--offset K] [--limit M]
             [--grep REGEX] [--errors] [--ids S12,1a2b3c4d]
 """
@@ -221,6 +221,10 @@ class Session:
         return self.end.date().isoformat() if self.end else "?"
 
     @property
+    def turns(self):  # typed prompts; a rejection's reason is not a turn
+        return sum(m != "✗" for m, _, _ in self.prompts)
+
+    @property
     def repo(self):
         return repo_key(self.cwd or "", self.pr_repo)
 
@@ -363,6 +367,8 @@ def select(args, current_id):
                   # reopening an old session appends metadata and bumps mtime without new work
                   "reopened, inactive in window" if not args.sessions and s.end and s.end < since else
                   "ran this skill" if s.ran_self else
+                  # a quick question can't show a routine; it only dilutes the counts
+                  f"under {args.min_turns} turns" if s.turns < args.min_turns else
                   "other repo" if want_repo and s.repo != want_repo.lower().replace("_", "-") else None)
         if reason:
             skipped[reason] += 1
@@ -413,7 +419,7 @@ def merge_skill_names(sessions):
         s.seq = [re.sub(r"^(Skill:|/)([\w-]+)$", lambda m: m[1] + alias.get(m[2], m[2]), x) for x in s.seq]
 
 
-def last_handoff(sessions, label):
+def last_handoff(sessions, label, sizes):
     """Earlier runs leave findings that may still be pending; a re-run should build on them, not re-derive them."""
     prev = max(Path(OWN, ".inspect").glob("sessions*handoff.md"), key=lambda f: f.stat().st_mtime, default=None)
     if not prev:
@@ -422,7 +428,7 @@ def last_handoff(sessions, label):
     newer = [label[s.id] for s in sessions if s.end and s.end > at]  # sessions sort by last activity: the tail
     return (f"Last handoff: {str(prev).replace(HOME, '~')} ({at.astimezone():%Y-%m-%d %H:%M}); "
             f"{len(newer)} kept sessions active since" +
-            (f" ({support_list(newer)}); --offset {len(sessions) - len(newer)} reads only those." if newer else "."))
+            (f" ({support_list(newer)}); only those: {read_plan(sizes, len(sessions) - len(newer))}" if newer else "."))
 
 
 # --- output
@@ -475,11 +481,22 @@ def batch_plan(sizes, target):
     return plan
 
 
+def read_plan(sizes, start=0):
+    """Pages to read yourself, or one subagent per batch; offsets count from start."""
+    sizes = sizes[start:]
+    total, alone = sum(sizes), sum(sizes) <= READ_ALONE
+    plan = " · ".join(f"--offset {start + o} --limit {n}" for o, n in batch_plan(sizes, PAGE if alone else BATCH))
+    return (f"~{total} tokens; read them yourself, --part sessions with the same window flags, one page per call: {plan}"
+            if alone else
+            f"~{total} tokens, too many for one context. One subagent per batch, each --part sessions with the same window flags: {plan}")
+
+
 def summary(sessions, skipped, oldest, args, want_repo, block_sizes):
     label = {s.id: f"S{i}" for i, s in enumerate(sessions, 1)}
     out = []
     window = f"newest {args.sessions} sessions" if args.sessions else f"last {args.days:g} days"
-    out.append(f"# Session digest — {window}" + (f", repo {want_repo}" if want_repo else ", all repos"))
+    out.append(f"# Session digest — {window}" + (f", repo {want_repo}" if want_repo else ", all repos") +
+               (f", ≥{args.min_turns} turns" if args.min_turns else ""))
     if oldest:
         first = dt.datetime.fromtimestamp(oldest).date()
         out.append(f"Transcripts on disk reach back to {first} (Claude Code prunes after cleanupPeriodDays, default 30).")
@@ -489,17 +506,8 @@ def summary(sessions, skipped, oldest, args, want_repo, block_sizes):
     else:
         out.append("No sessions matched.")
         return out
-    total = sum(block_sizes)
-    if total <= READ_ALONE:
-        out.append(f"Session blocks: ~{total} tokens; read them yourself, --part sessions with the same window "
-                   f"flags, one page per call: " +
-                   " · ".join(f"--offset {o} --limit {n}" for o, n in batch_plan(block_sizes, PAGE)))
-    else:
-        plan = batch_plan(block_sizes, BATCH)
-        out.append(f"Session blocks: ~{total} tokens, too many for one context. One subagent per batch, each "
-                   f"--part sessions with the same window flags: " +
-                   " · ".join(f"--offset {o} --limit {n}" for o, n in plan))
-    out.append(last_handoff(sessions, label))
+    out.append("Session blocks: " + read_plan(block_sizes))
+    out.append(last_handoff(sessions, label, block_sizes))
     repos = collections.Counter(s.repo for s in sessions)
     out.append("Repos: " + ", ".join(f"{r} {n}" for r, n in repos.most_common()))
 
@@ -529,9 +537,12 @@ def summary(sessions, skipped, oldest, args, want_repo, block_sizes):
     chains = [(label[s.id], [k for i, k in enumerate(s.skills) if i == 0 or k != s.skills[i - 1]]) for s in sessions]
     out += [f"- {' > '.join(g)} · {len(w)} sessions ({support_list(w)})" for g, w in recurring(chains, 2, 4, 2)] or ["- none"]
 
-    out.append("\n## Recurring flows (landmark tool sequences, ≥3 sessions)")
+    out.append("\n## Recurring flows (landmark tool sequences, ≥3 sessions; \"no skill ran\": sessions that used no skill at all)")
     flows = [(label[s.id], landmarks(s.seq)) for s in sessions]
-    out += [f"- {' > '.join(g)} · {len(w)} sessions ({support_list(w)})" for g, w in recurring(flows, 2, 4, 3)] or ["- none"]
+    bare = {label[s.id] for s in sessions if not s.skills}
+    noskill = lambda w: f" · no skill ran in {len(w & bare)}" if w & bare else ""
+    out += [f"- {' > '.join(g)} · {len(w)} sessions ({support_list(w)}){noskill(w)}"
+            for g, w in recurring(flows, 2, 4, 3)] or ["- none"]
 
     out.append("\n## Recurring phrases in typed prompts (≥3 sessions on ≥2 days)")
     where, days = collections.defaultdict(set), collections.defaultdict(set)
@@ -545,7 +556,8 @@ def summary(sessions, skipped, oldest, args, want_repo, block_sizes):
     for p in phrases:
         if not any(where[q] == where[p] and set(p.split()) & set(q.split()) for q in shown):
             shown.append(p)
-    out += [f"- \"{p}\" · {len(where[p])} sessions ({support_list(where[p])})" for p in shown[:15]] or ["- none"]
+    out += [f"- \"{p}\" · {len(where[p])} sessions ({support_list(where[p])}){noskill(where[p])}"
+            for p in shown[:15]] or ["- none"]
 
     out.append("\n## Friction (sessions affected)")
     def hit(pred):
@@ -651,6 +663,7 @@ def main():
     p.add_argument("--days", type=float, default=7, help="sessions active in the last N days (default 7)")
     p.add_argument("--sessions", type=int, help="newest N kept sessions instead of a day window")
     p.add_argument("--repo", help="only this repo key, or 'current' for the cwd's repo")
+    p.add_argument("--min-turns", type=int, default=0, help="skip sessions with fewer typed prompts (default 0)")
     p.add_argument("--part", choices=("all", "summary", "sessions"), default="all")
     p.add_argument("--offset", type=int, default=0, help="first session block to print (0-based)")
     p.add_argument("--limit", type=int, help="number of session blocks to print")
