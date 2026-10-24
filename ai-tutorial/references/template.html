@@ -1,0 +1,308 @@
+<!doctype html>
+<!--
+  ai-tutorial page skeleton. Replace every {{…}} and the EXAMPLE demo, then
+  `grep -n '{{\|EXAMPLE' page.html` should print nothing.
+
+  Math is MathJax (SVG output), not KaTeX: KaTeX needs a CDN stylesheet, and the
+  page contract allows stylesheets only from Google Fonts. SVG output needs no
+  fonts, and raw TeX stays readable if the CDN is unreachable. Inline $…$,
+  display $$…$$. After inserting math from JS, call MathJax.typesetPromise([el]).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{Concept Name}}</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1c1c1e; --muted: #66666c; --line: #e3e1da;
+    --accent: #2f5bd3; --accent-soft: #e9eefb; --good: #1d7a4c; --good-soft: #e5f4ec;
+    --warn: #a8510c; --warn-soft: #fbefe3; --code-bg: #f3f2ee;
+    --c1: #2f5bd3; --c2: #d4582f; --c3: #1f9a6b; --c4: #8a4fd3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141416; --surface: #1d1d20; --ink: #ececef; --muted: #a0a0a8; --line: #333338;
+      --accent: #7c9cf5; --accent-soft: #1f2840; --good: #5cc795; --good-soft: #17301f;
+      --warn: #f0a35e; --warn-soft: #36230f; --code-bg: #232327;
+      --c1: #7c9cf5; --c2: #f08a63; --c3: #5cc795; --c4: #b58cf5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141416; --surface: #1d1d20; --ink: #ececef; --muted: #a0a0a8; --line: #333338;
+    --accent: #7c9cf5; --accent-soft: #1f2840; --good: #5cc795; --good-soft: #17301f;
+    --warn: #f0a35e; --warn-soft: #36230f; --code-bg: #232327;
+    --c1: #7c9cf5; --c2: #f08a63; --c3: #5cc795; --c4: #b58cf5;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  a { color: var(--accent); }
+  h1 { font-size: 2.1rem; line-height: 1.2; margin: 4px 0 12px; }
+  h2 { font-size: 1.35rem; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h2 .n { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  .kicker { color: var(--muted); font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+  .objective { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; }
+  .meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: .92rem; margin: 16px 0; }
+  .meta dt { color: var(--muted); }
+  .meta dd { margin: 0; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  button { font: inherit; font-size: .85rem; color: var(--ink); background: var(--surface);
+           border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+           white-space: nowrap; flex-shrink: 0; }
+  nav.toc { font-size: .9rem; color: var(--muted); }
+  nav.toc a { color: var(--muted); text-decoration: none; margin-right: 12px; white-space: nowrap; }
+  nav.toc a:hover { color: var(--accent); }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+  .label { display: inline-block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+           padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+  .label.analogy { background: var(--good-soft); color: var(--good); }
+  .unverified { font-size: .72rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+                background: var(--warn-soft); color: var(--warn); }
+  .breaks { color: var(--warn); }
+
+  .tbl { overflow-x: auto; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+        overflow-x: auto; font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  .codeblock { position: relative; margin: 12px 0; }
+  .codeblock button { position: absolute; top: 8px; right: 8px; }
+  .out-label { font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+  pre.out { background: transparent; }
+
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+  details.transfer { border-color: var(--accent); }
+
+  figure.viz { margin: 16px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  figure.viz svg { width: 100%; height: auto; display: block; }
+  figure.viz svg text { fill: var(--muted); font-size: 12px; }
+  figure.viz svg .axis { stroke: var(--line); }
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: .93rem; }
+  .controls input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+  .controls output { font-family: ui-monospace, Menlo, monospace; min-width: 4ch; }
+  figcaption { color: var(--muted); font-size: .92rem; margin-top: 8px; }
+  .js .static { display: none; }
+
+  footer { margin-top: 56px; color: var(--muted); font-size: .85rem; }
+  mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="toolbar">
+    <p class="kicker">AI tutorial · {{field, e.g. Probability}}</p>
+    <button id="theme" type="button" aria-label="Toggle theme">◐ Theme</button>
+  </div>
+  <h1>{{Concept Name}}</h1>
+  <p class="objective"><strong>After this page you can</strong> {{verb the reader performs …}}</p>
+  <dl class="meta">
+    <dt>Read</dt><dd>{{15}} min</dd>
+    <dt>Assumes</dt><dd>{{only what sits above the practitioner baseline, each linked}}</dd>
+    <dt>Primary source</dt><dd><a href="{{url}}">{{Author et al. (year), Title}}</a></dd>
+  </dl>
+  <nav class="toc">
+    <a href="#problem">Problem</a><a href="#intuition">Intuition</a><a href="#math">Math</a>
+    <a href="#example">Example</a><a href="#play">Play</a><a href="#code">Code</a>
+    <a href="#pitfalls">Pitfalls</a><a href="#check">Check</a><a href="#next">Connections</a>
+  </nav>
+</header>
+
+<main>
+<section id="problem">
+  <h2><span class="n">1</span>The problem it solves</h2>
+  <p>{{A concrete failure without the concept. End on the question the page answers.}}</p>
+</section>
+
+<section id="intuition">
+  <h2><span class="n">2</span>Intuition</h2>
+  <div class="card">
+    <span class="label analogy">Analogy</span>
+    <p>{{One analogy.}}</p>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>In the analogy</th><th>In the concept</th></tr></thead>
+    <tbody><tr><td>{{part}}</td><td>{{real component}}</td></tr></tbody>
+  </table></div>
+  <p class="breaks"><strong>Where it breaks:</strong> {{one sentence}}</p>
+</section>
+
+<section id="math">
+  <h2><span class="n">3</span>The math</h2>
+  <p>{{Lead-in sentence.}}</p>
+  $$ {{\mathrm{softmax}(z)_i = \frac{e^{z_i / T}}{\sum_j e^{z_j / T}}}} $$
+  <div class="tbl"><table>
+    <thead><tr><th>Symbol</th><th>Meaning</th><th>Shape / range</th></tr></thead>
+    <tbody><tr><td>$z$</td><td>{{meaning}}</td><td>{{$\mathbb{R}^n$}}</td></tr></tbody>
+  </table></div>
+</section>
+
+<section id="example">
+  <h2><span class="n">4</span>Worked example</h2>
+  <p>{{Smallest numbers that still exercise the concept. Every value below comes from a run.}}</p>
+  <details>
+    <summary>Predict {{the result}} before revealing</summary>
+    <p>{{Answer with the intermediate values and one line of why.}}</p>
+  </details>
+</section>
+
+<section id="play">
+  <h2><span class="n">5</span>Play with it</h2>
+  <figure class="viz" id="viz-fig">
+    <svg id="viz" viewBox="0 0 640 260" role="img" aria-label="{{what the chart shows}}"></svg>
+    <div class="tbl static"><table>
+      <!-- Default state as plain HTML, shown when JS doesn't run. -->
+      <thead><tr><th>{{x}}</th><th>{{y at default setting}}</th></tr></thead>
+      <tbody><tr><td>{{…}}</td><td>{{…}}</td></tr></tbody>
+    </table></div>
+    <div class="controls">
+      <label for="knob">{{Parameter, e.g. Temperature T}}</label>
+      <input id="knob" type="range" min="0.1" max="5" step="0.1" value="1">
+      <output id="knob-out">1.0</output>
+    </div>
+    <figcaption>Notice that {{the behaviour to look for}}.</figcaption>
+  </figure>
+</section>
+
+<section id="code">
+  <h2><span class="n">6</span>Code</h2>
+  <p>{{From scratch, runnable as pasted.}}</p>
+  <div class="codeblock"><button type="button" class="copy">Copy</button><pre><code>{{# python 3.12, numpy 2.1
+import numpy as np
+…}}</code></pre></div>
+  <p class="out-label">Output (real run)</p>
+  <pre class="out">{{output}}</pre>
+  <p>{{The library call the reader will use, and the allclose check against the scratch version.}}</p>
+</section>
+
+<section id="pitfalls">
+  <h2><span class="n">7</span>Pitfalls</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Misconception or misuse</th><th>Why it's wrong</th><th>How it shows up</th></tr></thead>
+    <tbody><tr><td>{{…}}</td><td>{{…}}</td><td>{{symptom in a curve, metric or error}}</td></tr></tbody>
+  </table></div>
+</section>
+
+<section id="check">
+  <h2><span class="n">8</span>Check yourself</h2>
+  <details><summary>{{Q1 recall}}</summary><p>{{answer + one-line why}}</p></details>
+  <details><summary>{{Q2 compute}}</summary><p>{{…}}</p></details>
+  <details><summary>{{Q3 predict a change}}</summary><p>{{…}}</p></details>
+  <details class="transfer"><summary>Transfer: {{a case the page never walked through}}</summary><p>{{…}}</p></details>
+</section>
+
+<section id="next">
+  <h2><span class="n">9</span>Where it connects</h2>
+  <p><strong>Builds on:</strong> {{…}}<br><strong>Leads to:</strong> {{…}}</p>
+  <ul>
+    <li><a href="{{url}}">{{Primary paper}}</a>: {{what it is good for}}</li>
+    <li><a href="{{url}}">{{Textbook or lecture}}</a>: {{what it is good for}}</li>
+  </ul>
+</section>
+</main>
+
+<footer>
+  {{YYYY-MM-DD}} · Numbers come from a real run unless marked <span class="unverified">unverified</span>.
+  Analogies are labelled as such.
+</footer>
+</div>
+
+<script>
+  document.documentElement.classList.add('js');
+
+  // Theme toggle; storage is a convenience, so the page works when it throws.
+  (function () {
+    const root = document.documentElement;
+    try { const t = localStorage.getItem('ai-tutorial-theme'); if (t) root.dataset.theme = t; } catch (e) {}
+    document.getElementById('theme').addEventListener('click', () => {
+      const dark = root.dataset.theme
+        ? root.dataset.theme === 'dark'
+        : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'light' : 'dark';
+      try { localStorage.setItem('ai-tutorial-theme', root.dataset.theme); } catch (e) {}
+    });
+  })();
+
+  document.querySelectorAll('.codeblock .copy').forEach(btn => btn.addEventListener('click', () => {
+    const text = btn.parentElement.querySelector('code').innerText;
+    const done = () => { btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
+  }));
+
+  // Dependency-free SVG plotting for a 640×260 viewBox. Colors: 'var(--c1)'…'var(--c4)'.
+  const Plot = (() => {
+    const NS = 'http://www.w3.org/2000/svg', W = 640, H = 260, M = { l: 44, r: 12, t: 12, b: 32 };
+    const el = (svg, tag, attrs, text) => {
+      const e = document.createElementNS(NS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text != null) e.textContent = text;
+      svg.appendChild(e); return e;
+    };
+    const frame = (svg, ymin, ymax) => {
+      svg.replaceChildren();
+      const y = v => M.t + (H - M.t - M.b) * (1 - (v - ymin) / (ymax - ymin || 1));
+      el(svg, 'line', { class: 'axis', x1: M.l, x2: W - M.r, y1: y(ymin), y2: y(ymin) });
+      el(svg, 'text', { x: M.l - 6, y: y(ymax) + 4, 'text-anchor': 'end' }, +ymax.toFixed(2));
+      el(svg, 'text', { x: M.l - 6, y: y(ymin) + 4, 'text-anchor': 'end' }, +ymin.toFixed(2));
+      return y;
+    };
+    return {
+      // bars(svg, ['a','b'], [0.2, 0.8], {ymax: 1, color: 'var(--c1)'})
+      bars(svg, labels, values, o = {}) {
+        const ymin = o.ymin ?? 0, ymax = o.ymax ?? Math.max(...values), y = frame(svg, ymin, ymax);
+        const slot = (W - M.l - M.r) / values.length, bw = slot * 0.66;
+        values.forEach((v, i) => {
+          const x = M.l + i * slot + (slot - bw) / 2;
+          el(svg, 'rect', { x, y: y(v), width: bw, height: Math.max(0, y(ymin) - y(v)), rx: 3,
+                            style: `fill:${o.color || 'var(--c1)'}` });
+          el(svg, 'text', { x: x + bw / 2, y: y(v) - 4, 'text-anchor': 'middle' }, v.toFixed(o.digits ?? 2));
+          el(svg, 'text', { x: x + bw / 2, y: H - 10, 'text-anchor': 'middle' }, labels[i]);
+        });
+      },
+      // lines(svg, xs, [{ys, label, color}], {ymin, ymax})
+      lines(svg, xs, series, o = {}) {
+        const all = series.flatMap(s => s.ys);
+        const ymin = o.ymin ?? Math.min(...all), ymax = o.ymax ?? Math.max(...all), y = frame(svg, ymin, ymax);
+        const x = v => M.l + (W - M.l - M.r) * (v - xs[0]) / (xs[xs.length - 1] - xs[0] || 1);
+        el(svg, 'text', { x: M.l, y: H - 10 }, +xs[0].toFixed(2));
+        el(svg, 'text', { x: W - M.r, y: H - 10, 'text-anchor': 'end' }, +xs[xs.length - 1].toFixed(2));
+        series.forEach((s, k) => {
+          const c = s.color || `var(--c${k % 4 + 1})`;
+          el(svg, 'path', { d: s.ys.map((v, i) => `${i ? 'L' : 'M'}${x(xs[i])},${y(v)}`).join(''),
+                            style: `fill:none;stroke:${c};stroke-width:2` });
+          if (s.label) el(svg, 'text', { x: W - M.r - 4, y: M.t + 14 + k * 16, 'text-anchor': 'end', style: `fill:${c}` }, s.label);
+        });
+      },
+    };
+  })();
+
+  // EXAMPLE demo (softmax temperature): replace with the concept's own one-knob demo.
+  (function () {
+    const svg = document.getElementById('viz'), knob = document.getElementById('knob'),
+          out = document.getElementById('knob-out'), z = [2.0, 1.0, 0.1, -1.0];
+    const draw = () => {
+      const T = +knob.value, e = z.map(v => Math.exp(v / T)), s = e.reduce((a, b) => a + b, 0);
+      out.value = T.toFixed(1);
+      Plot.bars(svg, z.map(v => `z=${v}`), e.map(v => v / s), { ymax: 1 });
+    };
+    knob.addEventListener('input', draw); draw();
+  })();
+</script>
+</body>
+</html>
