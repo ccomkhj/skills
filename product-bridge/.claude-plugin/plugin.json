@@ -1,0 +1,21 @@
+{
+  "name": "product-bridge",
+  "description": "Product design loop for an existing Next.js/React app: define the problem, explore competing UX flows, validate the direction, prototype in the real codebase, and hand off a developer-ready behavior spec. Five skills, each usable alone, sharing one experiment record that keeps proposed, done, approved and unverified apart.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Huijo Kim",
+    "email": "huijo.kim@voids.ai"
+  },
+  "license": "MIT",
+  "keywords": [
+    "product",
+    "design",
+    "ux",
+    "wireframes",
+    "validation",
+    "prototype",
+    "handoff",
+    "figma",
+    "nextjs"
+  ]
+}

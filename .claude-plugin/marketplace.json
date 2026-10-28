@@ -12,6 +12,10 @@
     {
       "source": "./dual-haul",
       "name": "dual-haul"
+    },
+    {
+      "source": "./product-bridge",
+      "name": "product-bridge"
     }
   ]
 }

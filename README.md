@@ -47,6 +47,20 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 /sub-consult "<question>" --number 3              # one review round, then synthesize
 ```
 
+## Product design
+
+### product-bridge — problem to developer handoff (plugin, v0.1.0)
+
+Five skills for a PM working on an existing Next.js/React app. Each runs alone; together they share one experiment record in `.productbridge/<ID>/` that keeps proposed, done, approved and unverified claims apart, and keeps workflow approval separate from customer evidence. Figma MCP, Impeccable, repo access and the issue tracker are detected at runtime, and each falls back to an honest document when absent. Ships a `claude plugin eval` suite built from the spec's acceptance scenarios.
+
+| Skill | Description |
+|-------|-------------|
+| [pb-define-problem](./product-bridge/skills/pb-define-problem) | Stage 1: problem brief with observations, hypotheses and assumptions kept apart; starts or resumes an experiment |
+| [pb-explore-wireframes](./product-bridge/skills/pb-explore-wireframes) | Stage 2: 2–3 structurally different flows for the same task; real Figma only when a tool made it, otherwise a wireframe brief |
+| [pb-validate-direction](./product-bridge/skills/pb-validate-direction) | Stage 3: neutral research plan, or a source-traced evidence matrix plus the human's decision record |
+| [pb-build-prototype](./product-bridge/skills/pb-build-prototype) | Stage 4: isolated `pb/` branch prototype in the real app with an exact check report, or an implementation plan without repo access |
+| [pb-developer-handoff](./product-bridge/skills/pb-developer-handoff) | Stage 5: behavior spec, Given/When/Then criteria, issue draft; publishes to a connected tracker only after approval |
+
 ## Database evolution
 
 | Skill | Version | Description | Source |
@@ -97,7 +111,7 @@ Orchestrators that drive a goal to completion over many turns. `long-haul` and `
 npx skills add ccomkhj/skills
 ```
 
-`long-haul` and `dual-haul` are multi-skill plugins, so their bundled skills live one level deeper than the flat scan looks. To install them via `npx skills`, add `--full-depth`:
+`long-haul`, `dual-haul` and `product-bridge` are multi-skill plugins, so their bundled skills live one level deeper than the flat scan looks. To install them via `npx skills`, add `--full-depth`:
 
 ```bash
 npx skills add ccomkhj/skills --full-depth
@@ -105,12 +119,13 @@ npx skills add ccomkhj/skills --full-depth
 
 ### As Claude Code plugins
 
-`long-haul` and `dual-haul` are also published as Claude Code plugins (bundled skills + shared state). Inside Claude Code:
+`long-haul`, `dual-haul` and `product-bridge` are also published as Claude Code plugins (bundled skills + shared state). Inside Claude Code:
 
 ```
 /plugin marketplace add ccomkhj/skills
 /plugin install long-haul@ccomkhj-skills
 /plugin install dual-haul@ccomkhj-skills
+/plugin install product-bridge@ccomkhj-skills
 ```
 
 ### Manual setup

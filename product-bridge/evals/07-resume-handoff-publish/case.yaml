@@ -1,0 +1,5 @@
+schema_version: "1.0"
+name: 07-resume-handoff-publish
+description: Resume PB-001 from its record, write the handoff, and handle a publish request with no tracker connected.
+context:
+  scaffold_script: scaffold.sh
