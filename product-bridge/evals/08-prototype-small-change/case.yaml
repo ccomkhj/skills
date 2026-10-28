@@ -1,0 +1,5 @@
+schema_version: "1.0"
+name: 08-prototype-small-change
+description: Direct entry at the prototype stage for a small change in a tiny Next.js repo without installed dependencies.
+context:
+  scaffold_script: scaffold.sh
