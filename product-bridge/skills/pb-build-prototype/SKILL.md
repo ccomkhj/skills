@@ -1,7 +1,7 @@
 ---
 name: pb-build-prototype
 version: 0.1.0
-description: ProductBridge stage 4. Build an isolated, reversible prototype of a chosen concept inside an authorized Next.js/React codebase, reusing its components and tokens and exercising loading, empty, error, success, responsive and keyboard behavior, then report exactly what was built and checked. Without repository access it returns an implementation plan instead. Also the direct entry for a small change to an existing component. Use when a PM wants a working demo in the real app.
+description: ProductBridge stage 4. Build an isolated, reversible prototype of a chosen concept inside an authorized Next.js/React codebase, reusing its components and tokens and exercising loading, empty, error, success, responsive and keyboard behavior, then report exactly what was built and checked. Without repository access it returns an implementation plan instead. Use whenever someone asks to prototype or demo a UX change in the real app, whether a chosen concept or a small change to an existing component.
 argument-hint: "[experiment ID | concept | small change]"
 ---
 
@@ -21,8 +21,9 @@ Read [../pb-define-problem/references/contract.md](../pb-define-problem/referenc
   session, write the implementation plan into `prototype.md` anyway, say no
   code was written, and ask for access as the next step.
 - **Read before writing.** Router style, component library, tokens, data layer,
-  test setup. Reuse what exists so reviewers judge the concept, not foreign
-  code.
+  test setup. Before adding any UI element, search the component library for
+  one that already does the job. Reuse what exists so reviewers judge the
+  concept, not foreign code.
 - **Isolated and reversible.** Get the user's OK for repo and branch before the
   first edit (an explicit instruction to build there counts). Work on
   `pb/<id>-<slug>`, behind a new route or a flag that defaults off, with

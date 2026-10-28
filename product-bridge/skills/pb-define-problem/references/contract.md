@@ -122,6 +122,9 @@ people's and customer companies' names. Prototypes use synthetic data.
 
 ## Close every run with
 
+Update `experiment.json` first (create it on a first or direct entry): a stage
+artifact without its record can't be resumed. Then report:
+
 1. artifact path(s)
 2. stage status: from → to
 3. external actions this run, with results (or "none")
