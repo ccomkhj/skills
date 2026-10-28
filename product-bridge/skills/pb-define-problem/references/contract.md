@@ -98,6 +98,10 @@ Detect at runtime; never assume a tool exists because the user mentions it.
 | Preview | a deploy tool returns a URL, or you started a dev server | "no preview" |
 | Tracker | a GitHub/Linear/Jira/... tool is connected and authed | issue draft in `handoff.md`; "not published" |
 
+A missing tool, input or permission never ends a run empty-handed: write the
+stage's artifact in its fallback form, record the gap, and ask for the missing
+piece as the next step. The PM should always leave with something reviewable.
+
 ## Gates
 
 Each needs the user's explicit OK for that specific thing; approval of one is
@@ -113,8 +117,8 @@ not approval of another, and "looks good" on a draft is not a decision.
 
 Customer notes and proprietary code go only to integrations the user connected
 for that purpose: never into public previews, web searches, or third-party
-tools by default. Name participants `P1, P2…` in artifacts. Prototypes use
-synthetic data.
+tools by default. In artifacts, name participants `P1, P2…` and leave out
+people's and customer companies' names. Prototypes use synthetic data.
 
 ## Close every run with
 

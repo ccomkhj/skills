@@ -4,7 +4,7 @@ focus: {source: file, path: .productbridge/PB-001/prototype.md}
 weight: 2
 ---
 The repo has no node_modules and no Impeccable or deploy tooling. Pass only if ALL hold:
-1. It names the branch the work is on (a new branch, not main) and the files changed.
+1. It names the branch the work is on (pb/PB-001-threshold-error, not main) and the files changed.
 2. It says the existing FieldError (and Input) components were reused.
 3. Lint/typecheck/tests are reported as not run (or failed) with the reason (dependencies not installed), never as passed.
 4. Impeccable is reported as unavailable / not run.

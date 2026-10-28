@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# A minimal Next.js app (no node_modules) with an existing FieldError component to reuse.
+# A minimal Next.js app (no node_modules) with an existing FieldError component to reuse,
+# checked out on a prototype branch.
 set -euo pipefail
 mkdir -p app/rules/new components/ui
 cat > package.json <<'EOF'
@@ -71,3 +72,5 @@ printf 'node_modules/\n.next/\n' > .gitignore
 git init -q -b main
 git -c user.name=fixture -c user.email=fixture@example.com add -A
 git -c user.name=fixture -c user.email=fixture@example.com commit -qm "rules app"
+# The eval sandbox blocks writes under .git, so the branch is created here.
+git checkout -qb pb/PB-001-threshold-error

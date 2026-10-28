@@ -18,7 +18,8 @@ Read [../pb-define-problem/references/contract.md](../pb-define-problem/referenc
 ## Core ideas
 
 - **No repo, no code claims.** If you can't read and edit the app in this
-  session, write the implementation plan and say no code was written.
+  session, write the implementation plan into `prototype.md` anyway, say no
+  code was written, and ask for access as the next step.
 - **Read before writing.** Router style, component library, tokens, data layer,
   test setup. Reuse what exists so reviewers judge the concept, not foreign
   code.
@@ -44,7 +45,8 @@ Read [../pb-define-problem/references/contract.md](../pb-define-problem/referenc
 
 1. Load the experiment (selected concept, design links); detect repo, Figma,
    Impeccable, preview.
-2. Plan, confirm repo/branch, build, check, refine.
+2. Plan, confirm repo/branch, build, check, refine. A blocked step (no repo,
+   branch refused, check unavailable) ends the build there, not the run.
 3. Write `prototype.md` from [references/prototype.md](references/prototype.md);
    log branch, push and preview as external actions.
 4. Raise prototype to `ready_for_review`. It becomes the handoff's reference
