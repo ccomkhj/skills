@@ -10,7 +10,9 @@ Reads every ~/.claude/projects/*/*.jsonl within a day window and counts:
 - agents: Agent tool calls per subagent type
 - tools: calls per built-in tool name (every session loads them, so no "listed")
 
-Counts only. No prompt, message or tool-input text is copied out.
+Counts only, plus the 3 most recent sessions per item (id, time, cwd, transcript
+path) so the report can link back to them. No prompt, message or tool-input text
+is copied out.
 
     usage.py [--days 90] [--project DIR]      # prints a summary as JSON
 """
@@ -19,11 +21,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import heapq
 import json
 import re
 from pathlib import Path
 
 PROJECTS = Path.home() / ".claude" / "projects"
+RECENT = 3
 SLASH_RE = re.compile(r"<command-name>/([^<\s]+)</command-name>")
 MARKERS = (
     '"name":"Skill"',
@@ -44,36 +48,42 @@ def _ts(line: dict) -> str:
 class Stat:
     """Counts for one item, kept separately for all projects and for this project."""
 
-    __slots__ = ("model", "user", "listed", "sessions_model", "sessions_user", "last_model", "last_user")
+    __slots__ = ("model", "user", "listed", "by_session", "last_model", "last_user")
 
     def __init__(self):
         self.model = 0
         self.user = 0
         self.listed = 0
-        self.sessions_model: set[str] = set()
-        self.sessions_user: set[str] = set()
+        self.by_session: dict[str, list] = {}  # sid -> [last ts, model hits, user hits]
         self.last_model = ""
         self.last_user = ""
 
     def hit(self, who: str, sid: str, ts: str):
+        row = self.by_session.setdefault(sid, ["", 0, 0])
+        row[0] = max(row[0], ts)
         if who == "model":
             self.model += 1
-            self.sessions_model.add(sid)
+            row[1] += 1
             self.last_model = max(self.last_model, ts)
         else:
             self.user += 1
-            self.sessions_user.add(sid)
+            row[2] += 1
             self.last_user = max(self.last_user, ts)
 
-    def export(self) -> dict:
+    def export(self, where: dict[str, dict]) -> dict:
+        recent = heapq.nlargest(RECENT, self.by_session.items(), key=lambda kv: kv[1][0])
         return {
             "model": self.model,
             "user": self.user,
             "listed": self.listed,
-            "sessions_model": len(self.sessions_model),
-            "sessions_user": len(self.sessions_user),
+            "sessions_model": sum(1 for r in self.by_session.values() if r[1]),
+            "sessions_user": sum(1 for r in self.by_session.values() if r[2]),
             "last_model": self.last_model[:10],
             "last_user": self.last_user[:10],
+            "recent": [
+                {"sid": sid, "ts": r[0], "model": r[1], "user": r[2], **where.get(sid, {})}
+                for sid, r in recent
+            ],
         }
 
 
@@ -95,6 +105,7 @@ def collect(days: int, project: Path, root: Path = PROJECTS) -> dict:
     agents: dict[str, dict[str, Stat]] = {}
     tools: dict[str, dict[str, Stat]] = {}
     sessions: dict[str, set[str]] = {"all": set(), "here": set()}
+    where: dict[str, dict] = {}  # sid -> {cwd, path}, to link recent uses back to their session
 
     def stat(store, name, scope) -> Stat:
         return store.setdefault(name, {}).setdefault(scope, Stat())
@@ -176,10 +187,11 @@ def collect(days: int, project: Path, root: Path = PROJECTS) -> dict:
                     if name and not name.startswith("mcp__"):
                         for s in scopes:
                             stat(tools, name, s).hit("model", sid, ts)
+        where[sid] = {"cwd": cwd or "", "path": str(f)}
 
     def export(store):
         return {
-            n: {s: st.export() for s, st in by.items()} for n, by in sorted(store.items())
+            n: {s: st.export(where) for s, st in by.items()} for n, by in sorted(store.items())
         }
 
     return {

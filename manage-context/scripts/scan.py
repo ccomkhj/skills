@@ -38,6 +38,7 @@ CLAUDE_JSON = HOME / ".claude.json"
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE = SCRIPT_DIR / "report_template.html"
 sys.path.insert(0, str(SCRIPT_DIR))
+import inventory  # noqa: E402
 from usage import collect as collect_usage  # noqa: E402
 
 DEFAULT_CPT = 3.5  # chars per token when calibration is impossible
@@ -150,22 +151,6 @@ class Config:
             if (d / "plugin.json").exists() or (d / ".claude-plugin").exists():
                 return d
         return None
-
-    def skill_source(self, name: str) -> tuple[str, str, str | None]:
-        """(kind, group label, path) for a listed skill name."""
-        if ":" in name:
-            plugin = name.split(":", 1)[0]
-            return ("plugin-skill", plugin, None)
-        for kind, base in self.skill_dirs.items():
-            d = base / name
-            if (d / "SKILL.md").exists() or d.is_symlink():
-                real = d.resolve()
-                return (kind, kind, str(real))
-        if (self.project / ".claude" / "commands" / f"{name}.md").exists():
-            return ("project", "project", None)
-        if (CLAUDE_DIR / "commands" / f"{name}.md").exists():
-            return ("personal", "personal", None)
-        return ("bundled", "bundled", None)
 
     def plugin_kind(self, plugin: str) -> str:
         if plugin in self.plugin_ids:
@@ -350,6 +335,8 @@ def mcp_server_for_tool(tool: str, servers: set[str], cfg: Config) -> str | None
 def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
     cfg = Config(project)
     tr = parse_transcript(transcript)
+    inv = inventory.build(project, {n: t for n, (t, _) in tr["skills"].items()})
+    inv_by = {e["name"]: e for e in inv["skills"]}
     items: list[dict] = []
     flags: list[dict] = []
 
@@ -396,7 +383,7 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         if name in denied:
             flags.append(
                 {
-                    "item": it["id"],
+                    "item": it["id"], "cause": "not-applied",
                     "text": f"{name} is in permissions.deny ({denied[name]}) but still loaded.",
                 }
             )
@@ -475,7 +462,7 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         if srv in cfg.disabled_mcp:
             flags.append(
                 {
-                    "item": it["id"],
+                    "item": it["id"], "cause": "not-applied",
                     "text": f"{srv} is in disabledMcpServers for this project but still loaded.",
                 }
             )
@@ -492,7 +479,7 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         if n in loaded:
             flags.append(
                 {
-                    "item": f"mcp:{n}",
+                    "item": f"mcp:{n}", "cause": "mcpjson-key", "layer": layer,
                     "text": (
                         f"{n} is listed in disabledMcpjsonServers ({layer}) but that key only "
                         "affects servers defined in .mcp.json; it is still loaded."
@@ -500,66 +487,64 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
                 }
             )
 
-    # Skills
-    overrides = cfg.merged("skillOverrides")
-    for name, (text, turn) in tr["skills"].items():
-        kind, group, path = cfg.skill_source(name)
-        ov = overrides.get(name)
-        state = ov[0] if ov else "on"
-        name_only = text.strip() == f"- {name}" or text.strip() == f"- {name}:"
+    # Skills: every skill in the inventory, with the role it plays here. Listed ones
+    # carry their real size; the others cost nothing now (est_on_tokens says what Auto would).
+    changed_after = bool(tr["started"]) and inv["settings_mtime"] > dt.datetime.fromisoformat(
+        tr["started"].replace("Z", "+00:00")).timestamp()
+    hint = " Settings changed after this session started; measure a new session." if changed_after else ""
+    for e in inv["skills"]:
+        name = e["name"]
+        if e["scope"] == "elsewhere" or (e["scope"] == "plugin" and name not in tr["skills"]):
+            continue  # shown in the Skills panel (other projects) or on the plugin row
+        text, turn = tr["skills"].get(name, ("", 1))
+        listed = name in tr["skills"]
+        name_only = text.strip() in (f"- {name}", f"- {name}:")
         actions, note = [], ""
-        if kind == "plugin-skill":
-            plugin = group
+        if e["scope"] == "plugin":
             note = "Plugin skill: skillOverrides do not apply. Use the plugin row."
-            group = f"plugin: {plugin}"
-            if ov:
-                flags.append(
-                    {
-                        "item": f"skill:{name}",
-                        "text": (
-                            f'{name} has skillOverrides "{ov[0]}" ({ov[1]}) but plugin skills '
-                            "ignore skillOverrides; it is still listed."
-                        ),
-                    }
-                )
-        else:
-            plugin = None
-            for v, lbl in (
-                ("name-only", "Name only"),
-                ("user-invocable-only", "User-invocable only (no model invocation)"),
-                ("off", "Off"),
-            ):
-                actions.append(
-                    {"value": v, "label": lbl, "scopes": ["global", "project"]}
-                )
-            if ov:
-                actions.append(
-                    {"value": "on", "label": "On (remove override)", "scopes": [ov[1]]}
-                )
-                if ov[0] in ("off", "user-invocable-only") and not name_only:
-                    flags.append(
-                        {
-                            "item": f"skill:{name}",
-                            "text": f'{name} is "{ov[0]}" ({ov[1]}) but still listed.',
-                        }
-                    )
+            if e["layers"]:
+                flags.append({"item": f"skill:{name}", "cause": "plugin-skill", "text": (
+                    f"{name} has skillOverrides {e['layers']} but plugin skills ignore "
+                    "skillOverrides; it is still listed.")})
+        elif e["locked"] == "frontmatter":
+            note = "Its SKILL.md sets disable-model-invocation: true, so only Off changes it."
+            actions = [{"value": "off", "label": "Off", "scopes": ["global", "project"]},
+                       {"value": "on", "label": "/slash only (undo Off)", "scopes": ["global", "project"]}]
+        elif e["locked"] is None:
+            actions = [{"value": v, "label": lbl, "scopes": ["global", "project"]} for v, lbl in (
+                ("on", "Auto"), ("name-only", "Name only"),
+                ("user-invocable-only", "/slash only (no model invocation)"), ("off", "Off"))]
+        if listed and (e["role"] in ("user-invocable-only", "off") or (e["role"] == "name-only" and not name_only)):
+            flags.append({"item": f"skill:{name}", "cause": "not-applied",
+                          "text": f"{name} resolves to {e['role']} ({e['set_by']}) but is listed.{hint}"})
+        if not listed and e["role"] in ("on", "name-only") and e["scope"] != "bundled":
+            flags.append({"item": f"skill:{name}", "cause": "not-applied",
+                          "text": f"{name} resolves to {e['role']} but is not in this session's listing.{hint}"})
         it = add(
             kind="skill",
             name=name,
             category="Skills",
-            group=group if kind != "bundled" else "bundled (ships with Claude Code)",
-            chars=len(text) + 1,
+            group={"plugin": f"plugin: {e['plugin']}", "global": "global (~/.claude/skills)",
+                   "project": "this project (.claude/skills)", "account": "claude.ai account",
+                   "synced": "claude.ai organization", "bundled": "bundled (ships with Claude Code)",
+                   }[e["scope"]],
+            chars=len(text) + 1 if listed else 0,
             name_chars=len(f"- {name}") + 1,
+            listing_chars=e["listing_chars"],
             turn=turn,
-            preview=preview(text[len(f"- {name}:") :]) or "(name only, no description)",
+            preview=(preview(text[len(f"- {name}:"):]) if listed and not name_only else e["preview"])
+            or "(no description)",
             actions=actions,
-            state=state + (" · name-only" if name_only and state == "on" else ""),
+            state=e["role"],
             note=note,
-            path=path,
-            source=kind,
+            path=e["path"],
+            source=e["scope"],
+            **{k: e[k] for k in ("role", "set_by", "locked", "layers", "elsewhere", "where",
+                                 "model_only", "dmi", "plugin")},
+            listed=listed,
         )
-        if plugin:
-            plugin_members.setdefault(plugin, []).append(it)
+        if e["scope"] == "plugin":
+            plugin_members.setdefault(e["plugin"], []).append(it)
 
     # Agents
     for name, (ln, builtin, turn) in tr["agents"].items():
@@ -579,25 +564,32 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         if plugin and not builtin:
             plugin_members.setdefault(plugin, []).append(it)
 
-    # Plugin roll-up rows (not counted again in totals)
+    # Plugin roll-up rows (not counted again in totals). Every installed plugin gets
+    # a row, so a disabled one can be switched on.
     enabled = cfg.merged("enabledPlugins")
+    inv_plugins = {p["name"]: p for p in inv["plugins"]}
+    for p in inv["plugins"]:
+        if p["kind"] == "marketplace":
+            plugin_members.setdefault(p["name"], [])
     for plugin, members in sorted(plugin_members.items()):
         pkind = cfg.plugin_kind(plugin)
-        pid = cfg.plugin_ids.get(plugin)
+        ip = inv_plugins.get(plugin) or {}
+        pid = cfg.plugin_ids.get(plugin) or ip.get("id")
+        on = bool(members) or ip.get("enabled", True)
         actions, note = [], ""
         if pkind == "marketplace":
             actions = [
                 {
-                    "value": "disable",
-                    "label": "Disable plugin",
+                    "value": "disable" if on else "enable",
+                    "label": "Disable plugin" if on else "Enable plugin",
                     "scopes": ["global", "project"],
                 }
             ]
             ev = enabled.get(pid)
-            if ev and ev[0] is False:
+            if members and ev and ev[0] is False:
                 flags.append(
                     {
-                        "item": f"plugin:{plugin}",
+                        "item": f"plugin:{plugin}", "cause": "not-applied",
                         "text": f"{pid} is false in enabledPlugins ({ev[1]}) but its content is loaded.",
                     }
                 )
@@ -609,7 +601,7 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
             if ev and ev[0] is False:
                 flags.append(
                     {
-                        "item": f"plugin:{plugin}",
+                        "item": f"plugin:{plugin}", "cause": "synced-plugin",
                         "text": (
                             f"{plugin} is false in enabledPlugins ({ev[1]}) but is an "
                             "org-synced plugin from claude.ai, so that setting does not unload it."
@@ -620,20 +612,29 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
             note = f"Loaded from {cfg.skills_dir_plugin(plugin)}; another app may manage it."
         else:
             note = "Not installed locally; likely provided by your claude.ai account."
+        skill_names = ip.get("members") or [m["name"] for m in members if m["kind"] == "skill"]
+        kinds = sorted({m["kind"] for m in members})
         add(
             kind="plugin",
             name=plugin,
             category="Plugins (roll-up)",
             group=pkind,
             chars=sum(m["chars"] for m in members),
-            preview=f"{len(members)} item{'s' * (len(members) != 1)}: "
-            + ", ".join(sorted({m["kind"] for m in members})),
+            preview=(f"{len(members)} item{'s' * (len(members) != 1)}: " + ", ".join(kinds)) if members
+            else ("nothing loaded this session" if on else "disabled"),
             actions=actions,
             note=note,
             plugin_id=pid,
             members=[m["id"] for m in members],
             rollup=True,
             source=pkind,
+            state="on" if on else "off",
+            enabled=on,
+            set_by=ip.get("set_by"),
+            elsewhere=ip.get("elsewhere") or [],
+            skill_names=[n.split(":", 1)[-1] for n in skill_names],
+            est_listing_chars=sum(inv_by[n]["listing_chars"] for n in skill_names
+                                  if n in inv_by and not inv_by[n]["dmi"]),
         )
 
     # Memory, context and conversation (sizes only)
@@ -687,6 +688,11 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         i["tokens"] = round(i["chars"] / cpt)
         if i.get("name_chars"):
             i["name_tokens"] = max(1, round(i["name_chars"] / cpt))
+        if i["kind"] == "skill":  # what Auto would cost
+            full = i["listed"] and i["role"] == "on"
+            i["est_on_tokens"] = i["tokens"] if full else round(i["listing_chars"] / cpt)
+        if i["kind"] == "plugin" and not i["members"]:
+            i["est_on_tokens"] = round(i["est_listing_chars"] / cpt)
     estimated = sum(i["tokens"] for i in counted if i["turn"] == 1)
     if real and not calibrated and real > estimated:
         add(
@@ -720,6 +726,17 @@ def build(project: Path, transcript: Path, history: dict | None = None) -> dict:
         "calibrated": calibrated,
         "items": items,
         "flags": flags,
+        "inventory": {
+            "elsewhere": [
+                {k: e[k] for k in ("name", "where", "installed_in", "preview")}
+                for e in inv["skills"] if e["scope"] == "elsewhere"
+            ],
+            "stale": inv["stale"],
+            "broken_links": inv["broken_links"],
+            "projects_scanned": inv["projects_scanned"],
+            "disable_bundled": inv["disable_bundled"],
+            "changed_after_start": changed_after,
+        },
         "settings_files": {
             k: str(v).replace(str(HOME), "~") for k, v in cfg.layers.items()
         },
@@ -736,6 +753,7 @@ EMPTY = {
     "sessions_user": 0,
     "last_model": "",
     "last_user": "",
+    "recent": [],
 }
 
 
@@ -775,7 +793,21 @@ def attach_usage(items: list[dict], history: dict, servers: set[str], cfg: Confi
                     agg[s][k] += u[s][k]
                 for k in ("last_model", "last_user", "listed"):
                     agg[s][k] = max(agg[s][k], u[s][k])
+                agg[s]["recent"] = agg[s]["recent"] + u[s]["recent"]
+        for s in agg:
+            agg[s]["recent"] = _merge_recent(agg[s]["recent"])
         p["usage"] = agg
+
+
+def _merge_recent(rows: list[dict]) -> list[dict]:
+    """Members' recent sessions as one list: one row per session, newest 3."""
+    by: dict[str, dict] = {}
+    for r in rows:
+        m = by.setdefault(r["sid"], {**r, "model": 0, "user": 0})
+        m["ts"] = max(m["ts"], r["ts"])
+        m["model"] += r["model"]
+        m["user"] += r["user"]
+    return sorted(by.values(), key=lambda r: r["ts"], reverse=True)[:3]
 
 
 def _days_ago(date: str) -> int | None:
@@ -800,8 +832,8 @@ def recommend(it: dict, history: dict, mode: str) -> dict | None:
     days = history["days"]
 
     if it["kind"] == "skill":
-        if UIO not in acts or it["state"] != "on":
-            return None  # plugin skill, or already overridden
+        if UIO not in acts or it.get("role") != "on" or not it.get("listed"):
+            return None  # plugin skill, locked, already hidden, or not loaded
         model_s, listed = A["sessions_model"], A["listed"]
         typed = (
             f" · you typed /{it['name']} {A['user']}× (still works)" if A["user"] else ""
@@ -810,7 +842,7 @@ def recommend(it: dict, history: dict, mode: str) -> dict | None:
             return None
         # A project layer that pins the skill "on" beats a global override, so
         # the change has to land in this project's settings.local.json.
-        pinned = acts.get("on", [None])[0] in ("project", "project-shared")
+        pinned = it.get("set_by") in ("project", "project-shared")
         wide = "project" if pinned else "global"
         pin = " · a project setting pins it on, so this is project scope" if pinned else ""
         if model_s == 0:
@@ -833,8 +865,8 @@ def recommend(it: dict, history: dict, mode: str) -> dict | None:
                         f"({100 * model_s / listed:.1f}%): keep the name, drop the description{pin}")
         return None
 
-    if "disable" not in acts:
-        return None
+    if "disable" not in acts or (it["rollup"] and not it["members"]):
+        return None  # nothing to disable, or a plugin that loaded nothing this session
     scopes = acts["disable"]
     glob = "global" if "global" in scopes else "project"
     label = "calls" if it["kind"] in ("mcp", "tool") else "uses"
@@ -921,7 +953,22 @@ def main():
     )
     for cat, tok in sorted(by_cat.items(), key=lambda x: -x[1]):
         print(f"  {cat:<22} {tok:>7}")
-    print(f"actionable: ~{actionable} tokens · flags: {len(report['flags'])}")
+    print(f"actionable: ~{actionable} tokens · ignored settings: {len(report['flags'])}")
+    causes: dict[str, int] = {}
+    for f in report["flags"]:
+        causes[f.get("cause", "other")] = causes.get(f.get("cause", "other"), 0) + 1
+    if causes:
+        print("  by cause: " + " · ".join(f"{n} {c}" for c, n in sorted(causes.items(), key=lambda x: -x[1])))
+    sk = [i for i in report["items"] if i["kind"] == "skill" and i["source"] != "plugin"]
+    roles = {r: [i for i in sk if i["role"] == r] for r in inventory.STATES}
+    pl = [i for i in report["items"] if i["kind"] == "plugin"]
+    print(
+        "skills here: "
+        + " · ".join(f"{len(v)} {k}" + (f" (~{sum(i['tokens'] for i in v)})" if k in ("on", "name-only") else "")
+                     for k, v in roles.items())
+        + f" · plugins {sum(1 for i in pl if i['enabled'])} on / {sum(1 for i in pl if not i['enabled'])} off"
+        + f" · {len(report['inventory']['elsewhere'])} only in other projects"
+    )
     print_recommendations(report)
     print(f"html: {out / 'context-report.html'}")
 

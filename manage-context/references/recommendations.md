@@ -59,7 +59,8 @@ Evidence threshold drops to 2 sessions. Everything bear recommends, plus:
 ## Never recommended
 
 - plugin skills (`plugin:skill`): `skillOverrides` ignores them, so only the plugin row can act
-- skills that already have an override, or are listed name-only (≈ 2 tokens)
+- skills that aren't Auto here (already name-only, /slash only, off, or locked by frontmatter), or not in the session's listing
+- plugins that loaded nothing this session (disabled, or an MCP server that failed to connect)
 - `CORE_TOOLS`, which the session can't work without
 - anything with no switch: system prompt, agents, memory files, org-synced plugins
 - items listed in fewer sessions than the mode's evidence threshold (too new to judge)

@@ -28,25 +28,48 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding-bottom: 96px; }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px; }
-h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
-h2 { font-size: 15px; margin: 0 0 10px; }
-.meta { color: var(--muted); font-size: 12px; word-break: break-all; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+h1 { font-size: 17px; margin: 0 0 6px; letter-spacing: -.01em; }
+h2 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
+h3 { font-size: 14px; margin: 0 0 10px; }
+.meta { color: var(--muted); font-size: 11px; word-break: break-all; line-height: 1.4; }
+/* layout: module tabs on the left, one module at a time on the right */
+.app { display: grid; grid-template-columns: 268px minmax(0, 1fr); min-height: 100vh; }
+.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 20px 12px; display: flex; flex-direction: column; gap: 18px; }
+.brand { padding: 0 10px; }
+nav { display: flex; flex-direction: column; gap: 2px; }
+.tab { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; padding: 10px 12px 10px 10px; border-radius: 8px; border-left: 3px solid transparent; }
+.tab:hover { background: var(--bg); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tab[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 11%, var(--panel)); border-left-color: var(--accent); }
+.tab .t { font-weight: 600; font-size: 14px; }
+.tab .n { align-self: center; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+.tab .n:empty { display: none; }
+.tab .n.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: transparent; font-weight: 600; }
+.tab .n.hot { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.tab .g { grid-column: 1 / -1; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.side-foot { margin: auto 10px 0; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.main { min-width: 0; display: flex; flex-direction: column; }
+.content { flex: 1; width: 100%; max-width: 1480px; padding: 26px 28px 32px; }
+.vhead { display: flex; flex-wrap: wrap; gap: 12px 20px; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
+.vhead .btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.goal { margin: 0; color: var(--muted); max-width: 72ch; }
+.goal b { color: var(--ink); font-weight: 600; }
+.steps { margin: 0; padding-left: 20px; font-size: 13px; color: var(--muted); }
+.steps li { margin: 2px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 14px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+button.card { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.card:hover { border-color: var(--accent); }
+button.card .s::after { content: " →"; color: var(--accent); }
 .card .k { color: var(--muted); font-size: 12px; }
 .card .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .card .s { color: var(--muted); font-size: 12px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-details.flags { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
-details.flags summary { cursor: pointer; font-weight: 600; }
-details.flags li { margin: 4px 0; }
-details.flags a { color: inherit; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .legend button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-#treemap { position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: var(--line); }
+#treemap { position: relative; width: 100%; height: clamp(320px, 52vh, 540px); border-radius: 8px; overflow: hidden; background: var(--line); }
 .tm { position: absolute; overflow: hidden; border: 1px solid var(--panel); color: #fff; font-size: 11px; line-height: 1.2; padding: 3px 4px; cursor: pointer; }
 .tm:hover { filter: brightness(1.12); }
 .tm.sel { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 2; }
@@ -68,6 +91,10 @@ th[data-sort] { cursor: pointer; user-select: none; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .name { font-weight: 600; word-break: break-word; }
 .pv { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
+#skrows .pv, #rows .pv { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#skrows td:first-child { min-width: 220px; max-width: 380px; }
+#skrows td.src { min-width: 140px; max-width: 220px; overflow-wrap: anywhere; }
+#skrows td:last-child { white-space: nowrap; }
 .note { font-size: 12px; margin-top: 3px; color: var(--muted); font-style: italic; }
 .flag { display: inline-block; font-size: 11px; background: var(--warn-bg); color: var(--warn-ink); border-radius: 4px; padding: 0 5px; margin-left: 4px; font-weight: 600; }
 .later { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 4px; color: var(--muted); font-weight: 400; }
@@ -81,114 +108,225 @@ tr.changed td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 tr.hl { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .save { color: var(--ok); font-weight: 600; }
 .link { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; padding: 0; margin-top: 3px; }
-footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); z-index: 10; }
-footer .wrap { padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+footer { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); z-index: 10; }
+footer .in { max-width: 1480px; padding: 10px 28px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 footer .sum { font-variant-numeric: tabular-nums; }
 footer .sum b { font-size: 16px; }
 footer .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn { font: inherit; border-radius: 8px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .btn:disabled { opacity: .5; cursor: default; }
+.btn.sm { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+.btn.sm.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btns-inline { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cause .chead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+.cause h3 { margin: 0 0 8px; font-size: 15px; }
+.cause dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0 0 6px; font-size: 13px; }
+.cause dt { color: var(--muted); font-weight: 600; }
+.cause dd { margin: 0; max-width: 80ch; }
 details.panel summary { cursor: pointer; }
 pre.plan { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12px/1.4 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-all; }
 .help { font-size: 12px; color: var(--muted); }
 .modes { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
 .modes button { font: inherit; font-size: 12px; border: 0; background: var(--bg); color: var(--ink); padding: 5px 12px; cursor: pointer; }
 .modes button.on { background: var(--ink); color: var(--panel); }
-.rechead { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.rechead .btns { display: flex; gap: 8px; flex-wrap: wrap; }
-.recsum { font-size: 13px; }
+.recsum { font-size: 13px; margin-bottom: 6px; }
 .recsum b { font-variant-numeric: tabular-nums; }
-.reclist { margin: 8px 0 0; padding: 0; list-style: none; max-height: 300px; overflow: auto; border-top: 1px solid var(--line); }
-.reclist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; align-items: start; }
-.reclist .rn { font-weight: 600; word-break: break-word; }
-.reclist .rr { color: var(--muted); grid-column: 1 / -1; }
-.reclist .rs { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.reclist li.picked .rn::before { content: "✓ "; color: var(--ok); }
+.list { margin: 8px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; align-items: start; }
+.list li:last-child { border-bottom: 0; }
+.list .rn { font-weight: 600; word-break: break-word; }
+.list .rn a { color: inherit; }
+.list .rr { color: var(--muted); grid-column: 1 / -1; font-size: 12px; }
+.list .rs { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.list li.picked .rn::before { content: "✓ "; color: var(--ok); }
+.list .empty { color: var(--muted); grid-column: 1 / -1; }
 .rec { display: inline-block; font-size: 11px; border-radius: 4px; padding: 0 5px; margin-top: 3px; margin-right: 4px; cursor: pointer; border: 1px solid var(--accent); color: var(--accent); background: none; font-family: inherit; }
 .rec.on { background: var(--accent); color: var(--accent-ink); }
 .use { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .use b { color: var(--ink); font-weight: 600; }
+.ses { display: flex; gap: 4px; align-items: baseline; font-size: 11px; }
+.ses button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; }
+.ses button:hover { color: var(--accent); text-decoration: underline; }
+.ses .p { max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+.ses a { color: var(--muted); text-decoration: none; }
+.ses a:hover { color: var(--accent); }
+.cost { color: var(--warn-ink); font-weight: 600; }
+.rolebar { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.role { all: unset; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); }
+.role.on { box-shadow: inset 0 0 0 2px var(--ink); }
+.role .k { font-weight: 600; font-size: 13px; }
+.role .v { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.role .s { font-size: 11px; color: var(--muted); }
+.pill { display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 8px; font-weight: 600; white-space: nowrap; }
+.r-on { background: color-mix(in srgb, var(--c2) 28%, transparent); }
+.r-name-only { background: color-mix(in srgb, var(--c4) 30%, transparent); }
+.r-user-invocable-only { background: color-mix(in srgb, var(--c0) 28%, transparent); }
+.r-off { background: color-mix(in srgb, var(--c7) 28%, transparent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 12px; border: 0; border-right: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.seg button:last-child { border-right: 0; }
+.seg button.cur { background: color-mix(in srgb, var(--ink) 14%, var(--bg)); font-weight: 600; }
+.seg button.new { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+tr.grp td { background: var(--bg); font-weight: 600; font-size: 12px; cursor: pointer; user-select: none; }
+.why { font-size: 12px; color: var(--muted); }
+.warnline { background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; padding: 6px 10px; font-size: 12px; margin-bottom: 8px; }
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
 .toast.show { opacity: 1; }
-@media (max-width: 640px) {
-  #treemap { height: 320px; }
+@media (max-width: 880px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { height: auto; z-index: 11; padding: 10px 12px 0; gap: 6px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand .meta, .side-foot, .tab .g { display: none; }
+  nav { flex-direction: row; overflow-x: auto; }
+  .tab { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; border-left: 0; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0; white-space: nowrap; }
+  .tab[aria-selected="true"] { border-bottom-color: var(--accent); }
+  .content { padding: 18px 14px 24px; }
+  footer .in { padding: 10px 14px; justify-content: flex-start; }
   .card .v { font-size: 19px; }
-  footer .wrap { justify-content: flex-start; }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Context usage</h1>
-  <div class="meta" id="meta"></div>
-  <div class="cards" id="cards"></div>
-  <div id="flags"></div>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><h1>Context usage</h1><div class="meta" id="meta"></div></div>
+    <nav id="nav" role="tablist" aria-orientation="vertical" aria-label="Modules"></nav>
+    <p class="side-foot">Switches only stage changes. No file is touched until you paste the plan into Claude Code, which shows a dry run first.</p>
+  </aside>
 
-  <div class="panel" id="recpanel" hidden>
-    <div class="rechead">
-      <div>
-        <h2 style="margin:0 0 4px">Recommendations</h2>
-        <div class="recsum" id="recsum"></div>
+  <main class="main">
+  <div class="content">
+
+  <section class="view" id="v-baseline" role="tabpanel">
+    <header class="vhead"><div><h2></h2><p class="goal"></p></div></header>
+    <div class="cards" id="cards"></div>
+    <div class="panel">
+      <div class="legend" id="legend"></div>
+      <div id="treemap" role="img" aria-label="Treemap of context usage by category"></div>
+      <p class="help">Box area is estimated tokens. Click a box or a legend entry to list it in the table below. Striped boxes are removed by your current selection.</p>
+    </div>
+    <div class="panel">
+      <h3>Every item</h3>
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Search name, source, description" aria-label="Search">
+        <div id="chips"></div>
       </div>
+      <div class="filter-note" id="fnote"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th data-sort="name">Item</th>
+            <th data-sort="group">Source</th>
+            <th data-sort="tokens" class="num">Tokens</th>
+            <th data-sort="usage" title="Model calls · your /slash calls in the history window">Usage</th>
+            <th data-sort="state">Role / state</th>
+            <th>Action</th>
+            <th>Scope</th>
+            <th class="num">Saves</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="help" id="method"></p>
+  </section>
+
+  <section class="view" id="v-skills" role="tabpanel" hidden>
+    <header class="vhead">
+      <div><h2></h2><p class="goal"></p></div>
       <div class="btns">
-        <div class="modes" role="group" aria-label="Recommendation mode">
+        <span class="help">Switches write to</span>
+        <div class="modes" role="group" aria-label="Scope for switches" id="skscope">
+          <button type="button" data-scope="global" title="~/.claude/settings.json: every project">Global</button>
+          <button type="button" data-scope="project" title=".claude/settings.local.json: only this project, wins over Global">This project</button>
+        </div>
+        <div class="modes" role="group" aria-label="Group skills by" id="skgroup">
+          <button type="button" data-g="role">By role</button>
+          <button type="button" data-g="where">By where installed</button>
+        </div>
+      </div>
+    </header>
+    <div id="skwarn"></div>
+    <div class="recsum" id="skillsum"></div>
+    <div class="rolebar" id="rolebar"></div>
+    <div class="panel">
+      <div class="toolbar"><input type="search" id="sq" placeholder="Filter skills and plugins" aria-label="Filter skills"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th>Skill</th><th>Installed</th><th>Role here · set by</th><th>Other projects</th>
+            <th class="num">Tokens</th><th>Usage</th><th>Switch</th>
+          </tr></thead>
+          <tbody id="skrows"></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="help" id="skhelp"></p>
+  </section>
+
+  <section class="view" id="v-recs" role="tabpanel" hidden>
+    <header class="vhead">
+      <div><h2></h2><p class="goal"></p></div>
+      <div class="btns">
+        <div class="modes" role="group" aria-label="Recommendation mode" id="recmode">
           <button type="button" data-mode="bear" title="Conservative: convert only what the model never called in the window">Bear</button>
           <button type="button" data-mode="bull" title="Aggressive: convert everything the model does not call regularly">Bull</button>
         </div>
         <button class="btn" id="recclear">Clear selection</button>
         <button class="btn primary" id="recall">Select all</button>
       </div>
+    </header>
+    <div class="panel">
+      <div class="recsum" id="recsum"></div>
+      <p class="help" id="rechelp"></p>
+      <ul class="list" id="reclist"></ul>
     </div>
-    <p class="help" id="rechelp"></p>
-    <ul class="reclist" id="reclist"></ul>
-  </div>
+  </section>
 
-  <div class="panel">
-    <h2>Where the baseline goes</h2>
-    <div class="legend" id="legend"></div>
-    <div id="treemap" role="img" aria-label="Treemap of context usage by category"></div>
-    <p class="help">Box area is estimated tokens. Click a box to filter the table to its group. Striped boxes are removed by your current selection.</p>
-  </div>
+  <section class="view" id="v-flags" role="tabpanel" hidden>
+    <header class="vhead"><div><h2></h2><p class="goal"></p></div></header>
+    <div class="recsum" id="flagsum"></div>
+    <div id="flagcards"></div>
+  </section>
 
-  <div class="panel">
-    <div class="toolbar">
-      <input type="search" id="q" placeholder="Search name, source, description" aria-label="Search">
-      <div id="chips"></div>
+  <section class="view" id="v-plan" role="tabpanel" hidden>
+    <header class="vhead">
+      <div><h2></h2><p class="goal"></p></div>
+      <div class="btns">
+        <button class="btn" data-act="dl">Download plan.json</button>
+        <button class="btn primary" data-act="copy">Copy plan</button>
+      </div>
+    </header>
+    <div class="panel">
+      <div class="recsum" id="plansum"></div>
+      <ul class="list" id="planlist"></ul>
     </div>
-    <div class="filter-note" id="fnote"></div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr>
-          <th data-sort="name">Item</th>
-          <th data-sort="group">Source</th>
-          <th data-sort="tokens" class="num">Tokens</th>
-          <th data-sort="usage" title="Model calls · your /slash calls in the history window">Usage</th>
-          <th data-sort="state">State</th>
-          <th>Action</th>
-          <th>Scope</th>
-          <th class="num">Saves</th>
-        </tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <div class="panel">
+      <h3>How to apply</h3>
+      <ol class="steps">
+        <li>Copy plan, paste it into Claude Code (or save the download and give its path).</li>
+        <li>Claude runs a dry run: role before → after, every file edit, any rejection. Nothing changes yet.</li>
+        <li>Say yes to apply. A backup and an undo file are written first.</li>
+        <li>Start a new session: changes load from the next session on.</li>
+      </ol>
     </div>
-  </div>
+    <details class="panel" id="plandetails">
+      <summary><b>Plan JSON</b> <span class="help">what Copy plan puts on your clipboard</span></summary>
+      <pre class="plan" id="plan"></pre>
+    </details>
+  </section>
 
-  <details class="panel" id="plandetails">
-    <summary><b>Plan</b> <span class="help">Paste this back into Claude Code. It shows a dry run before changing any file.</span></summary>
-    <pre class="plan" id="plan"></pre>
-  </details>
-  <p class="help" id="method"></p>
+  </div>
+  <footer><div class="in">
+    <div class="sum" id="sum"></div>
+    <div class="btns">
+      <button class="btn" data-act="reset">Reset</button>
+      <button class="btn" data-act="dl">Download plan.json</button>
+      <button class="btn primary" data-act="copy">Copy plan</button>
+    </div>
+  </div></footer>
+  </main>
 </div>
-
-<footer><div class="wrap">
-  <div class="sum" id="sum"></div>
-  <div class="btns">
-    <button class="btn" id="reset">Reset</button>
-    <button class="btn" id="dl">Download plan.json</button>
-    <button class="btn primary" id="copy">Copy plan</button>
-  </div>
-</div></footer>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -252,44 +390,96 @@ const REPORT = /*__REPORT_DATA__*/null;
     else { parts.push(el("span", {}, el("b", { text: fmt(a.model) }), " model")); parts.push(el("span", {}, el("b", { text: fmt(a.user) }), " you")); }
     const last = [a.last_model, a.last_user].filter(Boolean).sort().pop();
     const title = `All projects: ${a.model} model · ${a.user} you${a.listed ? ` · loaded in ${a.listed} sessions` : ""}\nThis project: ${h.model} model · ${h.user} you${h.listed ? ` · loaded in ${h.listed}` : ""}${last ? `\nLast used ${last}` : ""}`;
-    return el("div", { class: "use", title }, ...parts.flatMap((x, i) => i ? [" · ", x] : [x]), last ? el("div", { text: last }) : null);
+    const recent = (a.recent || []).map(sessionLink);
+    return el("div", { class: "use" },
+      el("div", { title }, ...parts.flatMap((x, i) => i ? [" · ", x] : [x])),
+      ...(recent.length ? recent : [last ? el("div", { text: last }) : null]));
   };
+  // A recent session: click copies the command that resumes it; ↗ opens its raw transcript.
+  const pad = (n) => String(n).padStart(2, "0");
+  const when = (ts) => { const d = new Date(ts); return isNaN(d) ? ts.slice(0, 16).replace("T", " ") : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const shq = (x) => `'${String(x).replace(/'/g, "'\\''")}'`;
+  function sessionLink(r) {
+    const proj = (r.cwd || "").split("/").filter(Boolean).pop() || "?";
+    const n = r.model + r.user;
+    const cmd = `${r.cwd ? `cd ${shq(r.cwd)} && ` : ""}claude --resume ${r.sid}`;
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(cmd); toast("Resume command copied. Paste it in a terminal."); }
+      catch (e) { prompt("Copy this command to resume the session:", cmd); }
+    };
+    return el("div", { class: "ses" },
+      el("button", { title: `${when(r.ts)} · ${r.cwd || "unknown project"}\nsession ${r.sid}\n${n}× in this session\nClick to copy: ${cmd}`, onclick: copy },
+        el("span", { text: when(r.ts).slice(5) }), el("span", { class: "p", text: proj })),
+      r.path ? el("a", { href: "file://" + encodeURI(r.path), target: "_blank", title: "Open the raw transcript (JSONL)", text: "↗" }) : null);
+  }
 
+  // ---- skill roles: mirrors inventory.predict() and apply_plan.py ----
+  const ROLES = ["on", "name-only", "user-invocable-only", "off"];
+  const ROLE = { on: "Auto", "name-only": "Name only", "user-invocable-only": "/slash only", off: "Off" };
+  const ROLE_SHORT = { on: "Auto", "name-only": "Name", "user-invocable-only": "/slash", off: "Off" };
+  const ROLE_HELP = {
+    on: "Listed for the model with its description, so it may run the skill unasked. /name works.",
+    "name-only": "Listed by name only: the model can still pick it, for a few tokens. /name works.",
+    "user-invocable-only": "Hidden from the model. Runs only when you type /name.",
+    off: "Hidden from the model and from the / menu.",
+  };
+  const SET_BY = { default: "default (nothing sets it)", global: "global setting", "project-shared": "project setting (shared)", project: "this project's setting", frontmatter: "its SKILL.md (locked)", plugin: "its plugin", policy: "managed policy (locked)" };
+  function predict(it, action, scope) {
+    if (it.kind !== "skill" || it.locked === "policy" || !it.layers) return it.role;
+    const L = Object.assign({}, it.layers);
+    if (scope === "global") { if (action === "on") delete L.global; else L.global = action; }
+    else {
+      const lower = L["project-shared"] ?? L.global;
+      if (action === "on" && (lower === undefined || lower === "on")) delete L.project; else L.project = action;
+    }
+    const top = L.project ?? L["project-shared"] ?? L.global;
+    if (it.dmi) return top === "off" ? "off" : "user-invocable-only";
+    return top || "on";
+  }
+  const tokFor = (it, role) => role === "on" ? (it.est_on_tokens || 0) : role === "name-only" ? (it.name_tokens || 1) : 0;
+  const roleAfter = (it) => { const s = sel[it.id]; return s && s.action ? predict(it, s.action, s.scope) : it.role; };
+
+  // Positive = tokens saved per session, negative = tokens a switch adds.
   function savedMap() {
     const m = {};
-    const put = (id, t) => { m[id] = Math.max(m[id] || 0, t); };
     for (const [id, s] of Object.entries(sel)) {
       const it = byId[id];
-      if (!it || !s.action) continue;
-      if (it.kind === "plugin") it.members.forEach((mid) => put(mid, byId[mid].tokens));
-      else if (s.action === "name-only") put(id, Math.max(0, it.tokens - (it.name_tokens || 0)));
-      else if (s.action === "on") put(id, 0);
-      else put(id, it.tokens);
+      if (!it || !s.action || it.kind !== "plugin") continue;
+      if (s.action === "disable") it.members.forEach((mid) => { m[mid] = byId[mid].tokens; });
+      else m[id] = -(it.est_on_tokens || 0);
+    }
+    for (const [id, s] of Object.entries(sel)) {
+      const it = byId[id];
+      if (!it || !s.action || it.kind === "plugin" || id in m) continue;
+      m[id] = it.kind === "skill" ? it.tokens - tokFor(it, predict(it, s.action, s.scope)) : it.tokens;
     }
     return m;
   }
-  const itemSaving = (it, saved) => it.rollup ? it.members.reduce((a, m) => a + (saved[m] || 0), 0) : (saved[it.id] || 0);
+  const itemSaving = (it, saved) => it.rollup ? it.members.reduce((a, m) => a + (saved[m] || 0), saved[it.id] || 0) : (saved[it.id] || 0);
   const sumSaved = (saved) => Object.values(saved).reduce((a, b) => a + b, 0);
+  const signed = (n) => (n > 0 ? "−" : "+") + fmt(Math.abs(n));
 
   // ---- header ----
-  $("meta").textContent = [R.project, "session " + R.session_id, R.model, "generated " + R.generated].filter(Boolean).join(" · ");
+  const metaParts = [R.project, R.session_id && "session " + R.session_id, R.model, R.generated && "generated " + R.generated].filter(Boolean);
+  $("meta").replaceChildren(...metaParts.map((t) => el("div", { text: t })));
   const actionable = counted.filter(controllable).reduce((a, i) => a + i.tokens, 0);
-  const card = (k, v, s) => el("div", { class: "card" }, el("div", { class: "k", text: k }), el("div", { class: "v", text: v }), el("div", { class: "s", text: s }));
+  // A card with `go` is a shortcut to that module.
+  const card = (k, v, s, go) => el(go ? "button" : "div", { class: "card", type: go ? "button" : null, onclick: go ? () => show(go) : null },
+    el("div", { class: "k", text: k }), el("div", { class: "v", text: v }), el("div", { class: "s", text: s }));
   function cards(saved) {
     const s = sumSaved(saved);
     $("cards").replaceChildren(
       card("First-turn context", fmt(R.first_turn_tokens || baseline), "real usage before any work"),
       card("Added after turn 1", "+" + fmt(R.later_tokens), "items that connected late"),
       card("You can change", fmt(actionable), Math.round(100 * actionable / baseline) + "% of the baseline"),
-      card("Selected savings", fmt(s), s ? "baseline ~" + fmt(baseline) + " → ~" + fmt(baseline - s) : "pick actions below"),
-      HAS_HIST ? card(mode === "bear" ? "Bear suggests" : "Bull suggests", fmt(recRows().reduce((a, i) => a + recOf(i).est_tokens, 0)), `${recRows().length} changes · ${R.history.sessions.all} sessions / ${R.history.days} days`) : null,
+      card(s < 0 ? "Selected changes add" : "Selected savings", fmt(Math.abs(s)), s ? "baseline ~" + fmt(baseline) + " → ~" + fmt(baseline - s) : "nothing picked yet", s ? "plan" : null),
+      HAS_HIST ? card(mode === "bear" ? "Bear suggests" : "Bull suggests", fmt(recRows().reduce((a, i) => a + recOf(i).est_tokens, 0)), `${recRows().length} changes · ${R.history.sessions.all} sessions / ${R.history.days} days`, "recs") : null,
     );
   }
 
   function renderRecs() {
     if (!HAS_HIST) return;
-    $("recpanel").hidden = false;
-    document.querySelectorAll(".modes button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+    document.querySelectorAll("#recmode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
     const rows = recRows();
     const total = rows.reduce((a, i) => a + recOf(i).est_tokens, 0);
     const picked = rows.filter(isPicked).length;
@@ -308,17 +498,218 @@ const REPORT = /*__REPORT_DATA__*/null;
         el("span", { class: "rr", text: r.reason }),
       ));
     }
-    if (!rows.length) ul.append(el("li", {}, el("span", { class: "rr", text: "Nothing to recommend in this mode." })));
+    if (!rows.length) ul.append(el("li", {}, el("span", { class: "empty", text: "Nothing to recommend in this mode." })));
     $("recall").disabled = !rows.length;
   }
-  document.querySelectorAll(".modes button").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.mode; try { localStorage.setItem("mc:mode", mode); } catch (e) {} render(); }));
-  $("recall").addEventListener("click", () => { for (const it of recRows()) pick(it); persist(); render(); toast(`${recRows().length} ${mode} recommendations selected. Review the table, then copy the plan.`); });
+  document.querySelectorAll("#recmode button").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.mode; try { localStorage.setItem("mc:mode", mode); } catch (e) {} render(); }));
+  $("recall").addEventListener("click", () => { for (const it of recRows()) pick(it); persist(); render(); toast(`${recRows().length} ${mode} recommendations selected. Review them under Plan, then copy.`); });
   $("recclear").addEventListener("click", () => { sel = {}; persist(); render(); });
 
-  if (R.flags.length) {
-    const ul = el("ul");
-    for (const f of R.flags) ul.append(el("li", {}, el("a", { href: "#", text: f.text, onclick: (e) => { e.preventDefault(); focusItem(f.item); } })));
-    $("flags").append(el("details", { class: "flags" }, el("summary", { text: `${R.flags.length} config mismatches: an item is still loaded although a setting says otherwise` }), ul));
+  // ---- skills panel: who can use each skill here, and one-click switches ----
+  const INV = R.inventory || { elsewhere: [], stale: [], broken_links: [] };
+  const skillItems = items.filter((i) => i.kind === "skill" && i.source !== "plugin");
+  const pluginItems = items.filter((i) => i.kind === "plugin");
+  const WHERE = { global: "Global · ~/.claude/skills", project: "This project · .claude/skills", account: "claude.ai account", synced: "claude.ai organization", bundled: "Built-in" };
+  const sk = { role: null, group: "role", q: "", open: new Set(), shut: new Set() };
+  let skScope = "global";
+  try { skScope = localStorage.getItem("mc:skscope") || skScope; sk.group = localStorage.getItem("mc:skgroup") || sk.group; } catch (e) {}
+  const pill = (role, text) => el("span", { class: "pill r-" + role, title: ROLE_HELP[role] || "", text: text || ROLE[role] });
+  const scopeFor = (it) => ["project", "project-shared"].includes(it.set_by) ? "project" : skScope;
+  const elsewhereText = (xs, raw) => (xs || []).map((x) => `${x.project.split("/").pop()}: ${raw ? x.value : ROLE_SHORT[x.value] || x.value}`).join(", ");
+  function setByText(it) {
+    let t = SET_BY[it.set_by] || it.set_by || "";
+    const g = (it.layers || {}).global;
+    if (["project", "project-shared"].includes(it.set_by) && g && g !== it.role) t += ` (global: ${ROLE_SHORT[g]})`;
+    return t;
+  }
+  function stage(it, role) {
+    if (role === it.role) delete sel[it.id];
+    else sel[it.id] = { action: it.locked === "frontmatter" ? (role === "off" ? "off" : "on") : role, scope: scopeFor(it), role };
+    persist(); render();
+  }
+  function stagePlugin(p, on) {
+    if (on === p.enabled) delete sel[p.id];
+    else sel[p.id] = { action: on ? "enable" : "disable", scope: p.set_by === "project" ? "project" : skScope };
+    persist(); render();
+  }
+  function switchFor(it) {
+    if (!it.actions.length) return el("span", { class: "why", text: it.locked === "policy" ? "locked by managed policy" : "—" });
+    const s = sel[it.id], target = s ? (s.role || roleAfter(it)) : null;
+    const opts = it.locked === "frontmatter" ? ["user-invocable-only", "off"] : ROLES;
+    return el("div", { class: "seg", role: "group", "aria-label": "Role for " + it.name }, ...opts.map((r) =>
+      el("button", { type: "button", class: [r === it.role ? "cur" : "", target === r && r !== it.role ? "new" : ""].join(" ").trim(),
+        title: ROLE_HELP[r] + (r === it.role ? " (now)" : ""), text: ROLE_SHORT[r], onclick: () => stage(it, r) })));
+  }
+  function tokCell(it, saved) {
+    const d = itemSaving(it, saved);
+    const now = it.tokens ? fmt(it.tokens) + (it.rollup ? " Σ" : "") : el("span", { class: "why", title: "Listing cost if switched on", text: it.est_on_tokens ? `0 (${fmt(it.est_on_tokens)} if on)` : "0" });
+    return el("td", { class: "num" }, now, d ? el("div", { class: d > 0 ? "save" : "cost", text: signed(d) }) : null);
+  }
+  function skillRow(it, saved) {
+    const s = sel[it.id], after = roleAfter(it);
+    return el("tr", { id: "sk-" + it.id, class: s ? "changed" : "" },
+      el("td", {},
+        el("div", { class: "name" }, it.name,
+          it.model_only ? el("span", { class: "later", title: "user-invocable: false in its SKILL.md: not in the / menu", text: "model only" }) : null,
+          flagsBy[it.id] ? el("span", { class: "flag", title: flagsBy[it.id].join("\n"), text: "ignored setting" }) : null),
+        it.preview ? el("div", { class: "pv", text: it.preview }) : null),
+      el("td", { class: "src" }, WHERE[it.source] || it.source, it.where && it.where.includes("→") ? el("div", { class: "why", title: it.where.split("→ ").pop(), text: "→ " + it.where.split("→ ").pop().split("/").filter(Boolean).slice(-2).join("/") }) : null),
+      el("td", {}, pill(it.role), el("div", { class: "why", text: setByText(it) }),
+        s ? el("div", { class: "why" }, "→ ", pill(after), ` · ${SCOPE_LABEL[s.scope] || s.scope}${after === it.role ? " · no effect here" : ""}`) : null),
+      el("td", { class: "why", text: elsewhereText(it.elsewhere) || "—" }),
+      tokCell(it, saved),
+      el("td", {}, usageText(it) || el("span", { class: "src", text: "—" })),
+      el("td", {}, switchFor(it)));
+  }
+  function pluginRow(p, saved) {
+    const s = sel[p.id], after = s ? s.action === "enable" : p.enabled;
+    const names = p.skill_names || [];
+    const sw = p.actions.length
+      ? el("div", { class: "seg", role: "group", "aria-label": "Plugin " + p.name }, ...[true, false].map((on) =>
+          el("button", { type: "button", class: [on === p.enabled ? "cur" : "", s && on === after ? "new" : ""].join(" ").trim(), text: on ? "On" : "Off", onclick: () => stagePlugin(p, on) })))
+      : el("span", { class: "why", text: { "skills-dir": "No setting: a folder in ~/.claude/skills", synced: "Manage it on claude.ai" }[p.group] || p.note || "—" });
+    const ignored = p.members.filter((m) => byId[m] && byId[m].layers && Object.keys(byId[m].layers).length).length;
+    return el("tr", { id: "sk-" + p.id, class: s ? "changed" : "" },
+      el("td", {}, el("div", { class: "name" }, p.name, el("span", { class: "later", text: `${names.length} skill${names.length === 1 ? "" : "s"}` }),
+          flagsBy[p.id] ? el("span", { class: "flag", title: flagsBy[p.id].join("\n"), text: "ignored setting" }) : null,
+          ignored ? el("span", { class: "flag", title: "skillOverrides name these plugin skills, but plugin skills ignore them. Switch the plugin, or set disable-model-invocation in the skill's SKILL.md.", text: `${ignored} per-skill setting${ignored === 1 ? "" : "s"} ignored` }) : null),
+        el("div", { class: "pv", text: names.length ? names.slice(0, 14).join(", ") + (names.length > 14 ? " …" : "") : p.preview })),
+      el("td", { class: "src" }, "Plugin", el("div", { class: "why", text: p.plugin_id || p.group })),
+      el("td", {}, pill(p.enabled ? "on" : "off", p.enabled ? "On" : "Off"),
+        el("div", { class: "why", text: p.set_by ? SET_BY[p.set_by] : p.group === "marketplace" ? "never enabled" : "" }),
+        s ? el("div", { class: "why" }, "→ ", pill(after ? "on" : "off", after ? "On" : "Off"), ` · ${SCOPE_LABEL[s.scope]}`) : null),
+      el("td", { class: "why", text: elsewhereText(p.elsewhere, true) || "—" }),
+      tokCell(p, saved),
+      el("td", {}, usageText(p) || el("span", { class: "src", text: "—" })),
+      el("td", {}, sw));
+  }
+  const infoRow = (a, b, c) => el("tr", {}, el("td", {}, el("div", { class: "name", text: a }), c ? el("div", { class: "pv", text: c }) : null), el("td", { class: "src", colspan: 6, text: b }));
+
+  function renderSkills(saved) {
+    if (!skillItems.length && !pluginItems.length) return;
+    document.querySelectorAll("#skscope button").forEach((b) => b.classList.toggle("on", b.dataset.scope === skScope));
+    document.querySelectorAll("#skgroup button").forEach((b) => b.classList.toggle("on", b.dataset.g === sk.group));
+    const counts = Object.fromEntries(ROLES.map((r) => [r, skillItems.filter((i) => i.role === r)]));
+    const afterN = Object.fromEntries(ROLES.map((r) => [r, skillItems.filter((i) => roleAfter(i) === r).length]));
+    const pOn = pluginItems.filter((p) => p.enabled).length;
+    $("skillsum").textContent = `${skillItems.length} skills you can switch · ${pOn} of ${pluginItems.length} plugins on · ${INV.elsewhere.length} skills live only in other projects (${INV.projects_scanned} projects checked)`;
+    $("skwarn").replaceChildren(...(INV.changed_after_start ? [el("div", { class: "warnline", text: "Settings changed after this session started: roles below are current, token numbers are from the session. Measure a new session after switching." })] : []));
+    $("rolebar").replaceChildren(...ROLES.map((r) => {
+      const tok = counts[r].reduce((a, i) => a + i.tokens, 0), d = afterN[r] - counts[r].length;
+      return el("button", { class: "role" + (sk.role === r ? " on" : ""), title: ROLE_HELP[r], onclick: () => { sk.role = sk.role === r ? null : r; render(); } },
+        el("div", { class: "k" }, pill(r)), el("div", { class: "v", text: counts[r].length + (d ? ` → ${afterN[r]}` : "") }),
+        el("div", { class: "s", text: (tok ? `~${fmt(tok)} tokens · ` : "") + ROLE_HELP[r] }));
+    }));
+    const q = sk.q, hit = (t) => !q || t.toLowerCase().includes(q);
+    const skRows = (pred) => skillItems.filter(pred).filter((i) => (!sk.role || i.role === sk.role) && hit(`${i.name} ${i.preview} ${i.where}`))
+      .sort((a, b) => b.tokens - a.tokens || a.name.localeCompare(b.name));
+    const groups = sk.group === "role"
+      ? ROLES.map((r) => ({ key: r, title: `${ROLE[r]} — ${ROLE_HELP[r]}`, rows: skRows((i) => i.role === r) }))
+      : Object.keys(WHERE).map((w) => ({ key: w, title: WHERE[w], rows: skRows((i) => i.source === w) }));
+    if (!sk.role) {
+      groups.push({ key: "plugins", title: "Plugins — switched as a whole; per-skill switches do not apply to their skills",
+        plugins: pluginItems.filter((p) => hit(`${p.name} ${(p.skill_names || []).join(" ")}`)).sort((a, b) => (b.enabled - a.enabled) || b.tokens - a.tokens || a.name.localeCompare(b.name)) });
+      groups.push({ key: "elsewhere", closed: true, title: "Only in other projects — installed in that repo's .claude/skills, not available here",
+        info: INV.elsewhere.filter((e) => hit(e.name)).map((e) => [e.name, e.installed_in.join(", "), e.preview]) });
+      groups.push({ key: "stale", closed: true, title: "Settings for skills not on disk — a built-in command, a bundled skill, or a removed skill",
+        info: INV.stale.filter((s) => hit(s.name)).map((s) => [s.name, Object.entries(s.layers).map(([k, v]) => `${SCOPE_LABEL[k] || k}: ${ROLE[v]}`).join(" · "), ""]) });
+      groups.push({ key: "broken", closed: true, title: "Broken links in ~/.claude/skills — the target folder is gone",
+        info: INV.broken_links.filter(hit).map((b) => [b, "", ""]) });
+    }
+    const tb = $("skrows");
+    tb.replaceChildren();
+    for (const g of groups) {
+      const n = (g.rows || g.plugins || g.info).length;
+      if (!n) continue;
+      const open = g.closed ? sk.open.has(g.key) || !!q : !sk.shut.has(g.key);
+      const flip = () => { const set = g.closed ? sk.open : sk.shut; set.has(g.key) ? set.delete(g.key) : set.add(g.key); renderSkills(savedMap()); };
+      tb.append(el("tr", { class: "grp", onclick: flip }, el("td", { colspan: 7, text: `${open ? "▾" : "▸"} ${g.title} · ${n}` })));
+      if (!open) continue;
+      for (const it of g.rows || []) tb.append(skillRow(it, saved));
+      for (const p of g.plugins || []) tb.append(pluginRow(p, saved));
+      for (const x of g.info || []) tb.append(infoRow(...x));
+    }
+    $("skhelp").textContent = `A switch stages a change in the plan; nothing is written until you paste the plan into Claude Code, which shows a dry run first. Global writes ${R.settings_files.global}; This project writes ${R.settings_files.project} and wins over Global. A skill already decided by a project setting is always switched in this project, since a global value would lose there. Locked skills set disable-model-invocation in their SKILL.md, so only Off changes them. From chat: skills.py set NAME… auto|name|slash|off.`;
+  }
+  document.querySelectorAll("#skscope button").forEach((b) => b.addEventListener("click", () => { skScope = b.dataset.scope; try { localStorage.setItem("mc:skscope", skScope); } catch (e) {} render(); }));
+  document.querySelectorAll("#skgroup button").forEach((b) => b.addEventListener("click", () => { sk.group = b.dataset.g; try { localStorage.setItem("mc:skgroup", sk.group); } catch (e) {} render(); }));
+  $("sq").addEventListener("input", (e) => { sk.q = e.target.value.toLowerCase(); renderSkills(savedMap()); });
+
+  // ---- ignored settings: one card per cause (what you set → why it does nothing → fix) ----
+  const CAUSE = {
+    "plugin-skill": { title: "Per-skill switches on plugin skills",
+      set: "You switched these skills to Off or /slash only, one by one.",
+      why: "Claude Code ignores per-skill switches for skills that come from a plugin, so they are still listed in full.",
+      fix: "A plugin is all or nothing: turn the whole plugin off (its /name commands go too), or keep it. The leftover switches are harmless." },
+    "mcpjson-key": { title: "MCP servers turned off with the wrong setting",
+      set: "You listed these servers in disabledMcpjsonServers.",
+      why: "That setting only covers servers from a repo's .mcp.json. These are defined in ~/.claude.json, so they still load.",
+      fix: "Turn them off with the setting that works for them. The old entry can stay; it does nothing." },
+    "synced-plugin": { title: "claude.ai plugins switched off locally",
+      set: "You set these plugins to false in enabledPlugins.",
+      why: "They are synced from your claude.ai organization, which ignores that local setting.",
+      fix: "Turn them off on claude.ai." },
+    "not-applied": { title: "Not applied yet",
+      set: "Your settings now say something different from what this session loaded.",
+      why: "Settings are read when a session starts. These most likely changed after this one began.",
+      fix: "Nothing to fix. Start a new session and run the report again. If an item is still here then, the report got it wrong: tell Claude." },
+    other: { title: "Other", set: "", why: "", fix: "" },
+  };
+  const toggle = (id, s) => { if (sel[id] && sel[id].action === s.action && sel[id].scope === s.scope) delete sel[id]; else sel[id] = s; persist(); render(); };
+  const stagedBtn = (id, s, label, title) => {
+    const on = !!(sel[id] && sel[id].action === s.action && sel[id].scope === s.scope);
+    return el("button", { type: "button", class: "btn sm" + (on ? " on" : ""), title: on ? "Staged in the plan. Click to undo." : title, text: on ? "✓ " + label : label, onclick: () => toggle(id, s) });
+  };
+  const nameLink = (id, text) => el("a", { href: "#", text, onclick: (e) => { e.preventDefault(); focusItem(id); } });
+  function causeRows(cause, fs) {
+    if (cause === "plugin-skill") {
+      const byPlugin = {};
+      for (const f of fs) { const it = byId[f.item]; if (it) (byPlugin[it.plugin] = byPlugin[it.plugin] || []).push(it); }
+      return Object.entries(byPlugin).sort((a, b) => b[1].length - a[1].length).map(([pn, its]) => {
+        const p = byId["plugin:" + pn], tok = its.reduce((a, i) => a + i.tokens, 0);
+        const vals = {};
+        for (const i of its) { const v = Object.values(i.layers || {}).pop(); vals[v] = (vals[v] || 0) + 1; }
+        const fix = p && p.actions.length
+          ? stagedBtn(p.id, { action: "disable", scope: p.set_by === "project" ? "project" : "global" }, "Turn plugin off", `Disable the ${pn} plugin: all ${(p.skill_names || []).length} of its skills, agents and MCP servers leave the prompt.`)
+          : el("span", { class: "why", text: p && p.group === "skills-dir" ? "No switch: another app installs it in ~/.claude/skills" : p && p.group === "synced" ? "Synced from claude.ai: manage it there" : "No switch" });
+        return el("li", {},
+          el("span", { class: "rn" }, p ? nameLink(p.id, pn) : pn, el("span", { class: "later", text: "plugin" })),
+          el("span", { class: "rs" }, `~${fmt(tok)} `, fix),
+          el("span", { class: "rr", text: `${Object.entries(vals).map(([v, n]) => `${n} set to ${ROLE[v] || v}`).join(", ")}: ${its.map((i) => i.name.split(":").pop()).join(", ")}` }),
+          p && p.group === "skills-dir" ? el("span", { class: "rr", text: "Manual option: add disable-model-invocation: true to each of its SKILL.md files. An update from that app may undo it." }) : null);
+      });
+    }
+    return fs.map((f) => {
+      const it = byId[f.item];
+      let fix = null;
+      if (cause === "mcpjson-key" && it) {
+        const scopes = scopesFor(it, "disable");
+        fix = el("span", { class: "btns-inline" },
+          scopes.includes("project") ? stagedBtn(it.id, { action: "disable", scope: "project" }, "Turn off here", "Adds it to disabledMcpServers for this project only.") : null,
+          scopes.includes("global") ? stagedBtn(it.id, { action: "disable", scope: "global" }, "Turn off everywhere", "Moves its entry out of ~/.claude.json into a parked file; undo moves it back.") : null);
+      }
+      return el("li", {},
+        el("span", { class: "rn" }, it ? nameLink(it.id, it.name) : f.item, it ? el("span", { class: "later", text: it.kind }) : null),
+        el("span", { class: "rs" }, it ? `~${fmt(it.tokens)} ` : "", fix),
+        cause === "mcpjson-key" ? el("span", { class: "rr", text: `listed in disabledMcpjsonServers (${SCOPE_LABEL[f.layer] || f.layer || "settings"})` }) : el("span", { class: "rr", text: f.text }));
+    });
+  }
+  function renderFlags() {
+    if (!R.flags.length) return;
+    const groups = {};
+    for (const f of R.flags) (groups[CAUSE[f.cause] ? f.cause : "other"] = groups[CAUSE[f.cause] ? f.cause : "other"] || []).push(f);
+    const tokOf = (fs) => fs.reduce((a, f) => a + (byId[f.item] ? byId[f.item].tokens : 0), 0);
+    const order = Object.keys(groups).sort((a, b) => (a === "not-applied") - (b === "not-applied") || tokOf(groups[b]) - tokOf(groups[a]));
+    const live = tokOf(R.flags.filter((f) => f.cause !== "not-applied"));
+    $("flagsum").replaceChildren(el("b", { text: `${R.flags.length} setting${R.flags.length === 1 ? "" : "s"} with no effect` }),
+      ` in ${order.length} group${order.length === 1 ? "" : "s"}` + (live ? ` · ~${fmt(live)} tokens still load that you meant to remove` : ""));
+    $("flagcards").replaceChildren(...order.map((c) => {
+      const C = CAUSE[c], fs = groups[c];
+      return el("div", { class: "panel cause" },
+        el("div", { class: "chead" }, el("h3", { text: C.title }), el("span", { class: "help", text: `${fs.length} item${fs.length === 1 ? "" : "s"} · ~${fmt(tokOf(fs))} tokens` })),
+        C.set ? el("dl", {}, el("dt", { text: "You set" }), el("dd", { text: C.set }), el("dt", { text: "What happens" }), el("dd", { text: C.why }), el("dt", { text: "Fix" }), el("dd", { text: C.fix })) : null,
+        el("ul", { class: "list" }, ...causeRows(c, fs)));
+    }));
   }
 
   for (const c of cats) $("legend").append(el("button", { onclick: () => { state.chip = "all"; state.group = null; state.focus = null; state.cat = c; render(); } }, el("i", { style: `background:${color(c)}` }), `${c} · ${fmt(catTotal(c))}`));
@@ -378,7 +769,7 @@ const REPORT = /*__REPORT_DATA__*/null;
   // ---- table ----
   const CHIPS = [
     ["actionable", "Actionable"], ["all", "All"], ["skill", "Skills"], ["plugin", "Plugins"], ["mcp", "MCP"],
-    ["recommended", "Recommended"], ["fixed", "Built-in"], ["memory", "Memory"], ["agent", "Agents"], ["flagged", "Mismatches"], ["changed", "Selected"],
+    ["recommended", "Recommended"], ["fixed", "Built-in"], ["memory", "Memory"], ["agent", "Agents"], ["flagged", "Ignored settings"], ["changed", "Selected"],
   ];
   const state = { chip: "actionable", q: "", cat: null, group: null, focus: null, sort: "tokens", dir: -1 };
   for (const [k, l] of CHIPS) $("chips").append(el("button", { class: "chip", "data-chip": k, text: l, onclick: () => { state.chip = k; state.cat = state.group = state.focus = null; render(); } }));
@@ -420,7 +811,7 @@ const REPORT = /*__REPORT_DATA__*/null;
       const coveredBy = pid && sel[pid] && sel[pid].action;
       const nameCell = el("td", {},
         el("div", { class: "name" }, it.name,
-          flagsBy[it.id] ? el("span", { class: "flag", title: flagsBy[it.id].join("\n"), text: "mismatch" }) : null,
+          flagsBy[it.id] ? el("span", { class: "flag", title: flagsBy[it.id].join("\n"), text: "ignored setting" }) : null,
           it.turn > 1 ? el("span", { class: "later", title: "Arrived after turn 1 (connected late)", text: "late" }) : null),
         it.preview ? el("div", { class: "pv", text: it.preview }) : null,
         it.note ? el("div", { class: "note", text: it.note }) : null,
@@ -438,7 +829,8 @@ const REPORT = /*__REPORT_DATA__*/null;
           if (!v) delete sel[it.id];
           else {
             const sc = scopesFor(it, v), prev = (sel[it.id] || {}).scope;
-            sel[it.id] = { action: v, scope: sc.includes(prev) ? prev : (sc.includes("project") ? "project" : sc[0]) };
+            const want = it.kind === "skill" ? scopeFor(it) : "project";
+            sel[it.id] = { action: v, scope: sc.includes(prev) ? prev : (sc.includes(want) ? want : sc[0]) };
           }
           persist(); render();
         } }, el("option", { value: "", text: "Keep" }));
@@ -460,9 +852,10 @@ const REPORT = /*__REPORT_DATA__*/null;
         el("td", { class: "src" }, it.category, el("br"), it.group),
         tokCell,
         useCell,
-        el("td", { class: "state", text: it.state || "on" }),
+        el("td", { class: "state" }, it.kind === "skill" ? pill(it.role) : (it.state || "on"),
+          it.kind === "skill" ? el("div", { class: "why", text: setByText(it) }) : null),
         actCell, scopeCell,
-        el("td", { class: "num" + (sv ? " save" : ""), text: sv ? "−" + fmt(sv) : "" }),
+        el("td", { class: "num" + (sv > 0 ? " save" : sv < 0 ? " cost" : ""), text: sv ? signed(sv) : "" }),
       ));
     }
     if (!rows.length) tb.append(el("tr", {}, el("td", { colspan: 8, class: "src", text: "Nothing matches this filter." })));
@@ -484,22 +877,49 @@ const REPORT = /*__REPORT_DATA__*/null;
     return { manage_context_plan: 1, project: R.project, session_id: R.session_id, generated: R.generated, mode: HAS_HIST ? mode : undefined, actions };
   }
 
+  // The Plan module: every staged change in one readable list.
+  function renderPlan(saved, p, total) {
+    const ul = $("planlist");
+    ul.replaceChildren();
+    for (const [id, s] of Object.entries(sel)) {
+      const it = byId[id];
+      if (!it || !s.action) continue;
+      const sv = itemSaving(it, saved);
+      const change = it.kind === "skill" ? [pill(it.role), " → ", pill(roleAfter(it))]
+        : it.kind === "plugin" ? [pill(it.enabled ? "on" : "off", it.enabled ? "On" : "Off"), " → ", pill(s.action === "enable" ? "on" : "off", s.action === "enable" ? "On" : "Off")]
+        : [`${it.state || "on"} → ${(it.actions.find((x) => x.value === s.action) || {}).label || s.action}`];
+      ul.append(el("li", { class: isPicked(it) ? "picked" : "" },
+        el("span", { class: "rn" }, el("a", { href: "#", text: it.name, onclick: (e) => { e.preventDefault(); focusItem(id); } }), el("span", { class: "later", text: it.kind })),
+        el("span", { class: "rs" }, sv ? el("span", { class: sv > 0 ? "save" : "cost", text: signed(sv) }) : "", " ",
+          el("button", { class: "link", text: "remove", onclick: () => { delete sel[id]; persist(); render(); } })),
+        el("span", { class: "rr" }, ...change, ` · ${SCOPE_LABEL[s.scope] || s.scope}`, isPicked(it) ? ` · ${mode} recommendation` : "")));
+    }
+    if (!ul.children.length) ul.append(el("li", {}, el("span", { class: "empty", text: "Nothing picked yet. Stage changes in Baseline (Action column), Skills (Switch) or Recommendations." })));
+    $("plansum").replaceChildren(el("b", { text: `${p.actions.length} change${p.actions.length === 1 ? "" : "s"}` }),
+      p.actions.length ? ` · ${total < 0 ? "adds" : "saves"} ~${fmt(Math.abs(total))} tokens per session · baseline ~${fmt(baseline)} → ~${fmt(baseline - total)}` : "");
+  }
+
   function render() {
     const saved = savedMap();
     cards(saved);
+    renderSkills(saved);
     renderRecs();
+    renderFlags();
     drawTreemap(saved);
     renderRows(saved);
     const p = plan(), total = sumSaved(saved);
+    renderPlan(saved, p, total);
+    renderNav(p);
     $("sum").replaceChildren(el("b", { text: `${p.actions.length} change${p.actions.length === 1 ? "" : "s"}` }),
-      ` · saves ~${fmt(total)} tokens (${Math.round(100 * total / baseline)}%) · baseline ~${fmt(baseline)} → ~${fmt(baseline - total)}`);
+      ` · ${total < 0 ? "adds" : "saves"} ~${fmt(Math.abs(total))} tokens (${Math.round(100 * Math.abs(total) / baseline)}%) · baseline ~${fmt(baseline)} → ~${fmt(baseline - total)}`);
     $("plan").textContent = JSON.stringify(p, null, 2);
-    $("copy").disabled = $("dl").disabled = !p.actions.length;
+    document.querySelectorAll('[data-act="copy"], [data-act="dl"]').forEach((b) => { b.disabled = !p.actions.length; });
   }
 
   function focusItem(id) {
     const it = byId[id];
     if (!it) return;
+    show("baseline");
     Object.assign(state, { chip: "all", cat: it.category, group: it.group, focus: id, q: "" });
     $("q").value = "";
     render();
@@ -508,25 +928,82 @@ const REPORT = /*__REPORT_DATA__*/null;
   }
   function toast(t) { const x = $("toast"); x.textContent = t; x.classList.add("show"); setTimeout(() => x.classList.remove("show"), 1800); }
 
-  $("copy").addEventListener("click", async () => {
+  const act = (name, fn) => document.querySelectorAll(`[data-act="${name}"]`).forEach((b) => b.addEventListener("click", fn));
+  act("copy", async () => {
     const text = JSON.stringify(plan(), null, 2);
     try { await navigator.clipboard.writeText(text); toast("Plan copied. Paste it into Claude Code."); }
     catch (e) {
+      show("plan");
       $("plandetails").open = true;
       const r = document.createRange(); r.selectNodeContents($("plan"));
       const s = getSelection(); s.removeAllRanges(); s.addRange(r);
       toast("Plan selected. Press ⌘C or Ctrl+C.");
     }
   });
-  $("dl").addEventListener("click", () => {
+  act("dl", () => {
     const a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(plan(), null, 2)], { type: "application/json" })), download: "context-plan.json" });
     document.body.append(a); a.click(); a.remove();
   });
-  $("reset").addEventListener("click", () => { sel = {}; persist(); render(); });
+  act("reset", () => { sel = {}; persist(); render(); });
+
+  // ---- modules: left tabs, one view at a time; the URL hash keeps the open one ----
+  const kfmt = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(Math.round(n));
+  const VIEWS = [
+    { id: "baseline", label: "Baseline", title: "Where the baseline goes", on: true,
+      goal: "What Claude loads before you type anything, and what each part costs.",
+      how: "Bigger box, more tokens. Every session pays this before any work starts." },
+    { id: "skills", label: "Skills", title: "Skills: the role each one plays here", on: skillItems.length + pluginItems.length > 0,
+      goal: "Which skills Claude can see in this project. Switch each one.",
+      how: "Auto: Claude may run it unasked. Name only: cheaper listing. /slash only: runs only when you type it. Off: gone." },
+    { id: "recs", label: "Recommendations", title: "Recommendations", on: HAS_HIST,
+      goal: HAS_HIST ? `What ${R.history.days} days of your usage suggest turning down.` : "",
+      how: "Bear only touches what was never used. Bull goes further. Select what you agree with." },
+    { id: "flags", label: "Ignored settings", title: "Settings that have no effect", on: R.flags.length > 0,
+      goal: "Settings that don't do what you meant, and how to fix each.",
+      how: "Each card says what you set, why it does nothing, and the fix." },
+    { id: "plan", label: "Plan", title: "Plan", on: true,
+      goal: "Every change you picked, in one list, ready to apply.",
+      how: "Copy it into Claude Code. It shows a dry run before changing any file." },
+  ].filter((v) => v.on);
+  let view = null;
+  for (const v of VIEWS) {
+    $("nav").append(el("button", { type: "button", class: "tab", role: "tab", id: "tab-" + v.id, "data-view": v.id, "aria-controls": "v-" + v.id, onclick: () => show(v.id) },
+      el("span", { class: "t", text: v.label }), el("span", { class: "n", id: "n-" + v.id }), el("span", { class: "g", text: v.goal })));
+    const head = $("v-" + v.id).querySelector(".vhead");
+    head.querySelector("h2").textContent = v.title;
+    head.querySelector(".goal").replaceChildren(el("b", { text: v.goal }), " " + v.how);
+  }
+  $("nav").addEventListener("keydown", (e) => {
+    const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    const i = VIEWS.findIndex((v) => v.id === view), next = VIEWS[(i + d + VIEWS.length) % VIEWS.length].id;
+    show(next); $("tab-" + next).focus();
+  });
+  function show(id) {
+    if (!VIEWS.some((v) => v.id === id)) id = "baseline";
+    if (id === view) return;
+    view = id;
+    document.querySelectorAll(".view").forEach((s) => { s.hidden = s.id !== "v-" + id; });
+    document.querySelectorAll(".tab").forEach((t) => { const on = t.dataset.view === id; t.setAttribute("aria-selected", on); t.tabIndex = on ? 0 : -1; });
+    try { history.replaceState(null, "", "#" + id); } catch (e) {}
+    window.scrollTo(0, 0);
+    if (id === "baseline") drawTreemap(savedMap());
+  }
+  function renderNav(p) {
+    const badge = (id, text, cls) => { const n = $("n-" + id); if (n) { n.textContent = text; n.className = "n" + (cls ? " " + cls : ""); } };
+    badge("baseline", "~" + kfmt(R.first_turn_tokens || baseline));
+    badge("skills", String(skillItems.length));
+    if (HAS_HIST) badge("recs", String(recRows().length));
+    badge("flags", String(R.flags.length), "warn");
+    badge("plan", p.actions.length ? String(p.actions.length) : "", "hot");
+  }
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
   let rz;
   window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => drawTreemap(savedMap()), 120); });
 
   $("method").textContent = `Method: each item is sized by its characters in the session transcript and divided by one ratio (${R.chars_per_token} chars/token, ${R.calibrated ? "calibrated so turn-1 items add up to the real first-turn usage" : "default, because calibration was out of range; the residual is shown as Unattributed"}). The total is real; per-item numbers are estimates, since JSON tool schemas and prose tokenize differently. Changes apply from the next session. Transcript: ${R.transcript}.${R.history ? ` Usage counts come from ${R.history.sessions.all} transcripts since ${R.history.since} (${R.history.sessions.here} in this project): Skill tool calls count as the model's, typed /slash commands and @mentions as yours. Rules: references/recommendations.md.` : " Usage history was not collected (--no-history)."}`;
+  show(location.hash.slice(1) || "baseline");
   render();
 })();
 </script>

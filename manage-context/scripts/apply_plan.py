@@ -25,6 +25,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import inventory  # noqa: E402
+
 HOME = Path.home()
 CLAUDE_DIR = HOME / ".claude"
 CLAUDE_JSON = HOME / ".claude.json"
@@ -73,6 +76,17 @@ def get(doc: dict, keys: list):
 # ---------- plan -> primitive edits ----------
 
 
+def local_plugins() -> set[str]:
+    """Short names of plugins installed on this machine; their skills ignore skillOverrides."""
+    inst = load(CLAUDE_DIR / "plugins" / "installed_plugins.json")
+    out = {pid.split("@")[0] for pid in (inst.get("plugins") or {})}
+    g = CLAUDE_DIR / "skills"
+    for d in g.iterdir() if g.is_dir() else []:
+        if inventory._is_plugin_dir(d):
+            out.add(inventory._manifest(d).get("name") or d.name)
+    return out
+
+
 def edit(file: Path, keys: list, op: str, value=None, secret=False) -> dict:
     return {"file": str(file), "keys": keys, "op": op, "value": value, "secret": secret}
 
@@ -87,18 +101,32 @@ def compile_action(a: dict, project: Path) -> tuple[list[dict], list[str]]:
     if kind == "skill":
         if action not in SKILL_STATES or scope not in ("global", "project"):
             raise ValueError(f"skill {target}: unsupported {action}/{scope}")
-        if a.get("source") == "plugin-skill" or ":" in target:
-            raise ValueError(f"skill {target}: plugin skills ignore skillOverrides; disable the plugin")
-        f = settings_file(scope, project)
+        prefix = target.split(":", 1)[0] if ":" in target else None
+        if a.get("source") in ("plugin-skill", "plugin") or (prefix and prefix in local_plugins()):
+            raise ValueError(f"skill {target}: plugin skills ignore skillOverrides; switch the {prefix} plugin")
         keys = ["skillOverrides", target]
-        if action == "on":
-            return [edit(f, keys, "delete")], warn
+        shared, local = project / ".claude" / "settings.json", settings_file("project", project)
+        md = next((m for m in (project / ".claude" / "skills" / target / "SKILL.md",
+                               CLAUDE_DIR / "skills" / target / "SKILL.md") if m.exists()), None)
+        if md and action in ("on", "name-only") and inventory._flag(
+                inventory.frontmatter(md).get("disable-model-invocation"), False):
+            warn.append(f"{tilde(md)} sets disable-model-invocation: true, so {target} stays /slash only; "
+                        "only `off` changes it")
         if scope == "global":
-            for layer in (project / ".claude" / "settings.json", settings_file("project", project)):
+            for layer in (shared, local):
                 v = get(load(layer), keys)
                 if v is not ABSENT:
                     warn.append(f"{tilde(layer)} sets {target}={v!r}, which overrides the global value here")
-        return [edit(f, keys, "set", action)], warn
+            f = settings_file("global", project)
+            return [edit(f, keys, "delete") if action == "on" else edit(f, keys, "set", action)], warn
+        # project scope = settings.local.json, the top layer: "on" must be explicit
+        # when a lower layer would otherwise hide the skill.
+        lower = get(load(shared), keys)
+        if lower is ABSENT:
+            lower = get(load(settings_file("global", project)), keys)
+        if action == "on" and lower in (ABSENT, "on"):
+            return [edit(local, keys, "delete")], warn
+        return [edit(local, keys, "set", action)], warn
 
     if kind == "plugin":
         pid = a.get("plugin_id")
@@ -111,8 +139,9 @@ def compile_action(a: dict, project: Path) -> tuple[list[dict], list[str]]:
         f = settings_file(scope, project)
         if scope == "global":
             for layer in (project / ".claude" / "settings.json", settings_file("project", project)):
-                if get(load(layer), ["enabledPlugins", pid]) is True:
-                    warn.append(f"{tilde(layer)} enables {pid}; it stays on in this project")
+                v = get(load(layer), ["enabledPlugins", pid])
+                if v is not ABSENT and v != (action == "enable"):
+                    warn.append(f"{tilde(layer)} sets {pid}={v!r}, which overrides the global value here")
         return [edit(f, ["enabledPlugins", pid], "set", action == "enable")], warn
 
     if kind == "mcp":

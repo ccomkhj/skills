@@ -77,13 +77,17 @@ Five stages for a PM working on an existing Next.js/React app. Each runs alone; 
 
 | Skill | Version | Description |
 |-------|---------|-------------|
-| [manage-context](./manage-context) | 1.2.1 | Measure what fills your context window and suggest which skills/MCPs to disable. `/manage-context` |
+| [manage-context](./manage-context) | 1.3.0 | See what fills your context window and switch each skill, plugin, MCP server or tool on or off. `/manage-context` |
 | [scan-sessions-and-learn](./scan-sessions-and-learn) | 1.7.1 | Review recent sessions for recurring workflows and friction, and route each lesson to the right fix |
 | [organize-skill-mcp](./organize-skill-mcp) | 1.0.0 | Scan skill and MCP configs across tools (Claude, Cursor, Codex, …) and suggest cleanup |
 | [find-overlapping-skills](./find-overlapping-skills) | 1.0.0 | Find duplicate or overlapping skills and disable the extras |
 | [skill-flow](./skill-flow) | 1.0.0 | Audit a skill family's flow for broken handoffs and dead ends, without editing it |
 | [improve-skills](./improve-skills) | 1.1.0 | Apply one lesson to one skill, after your confirmation |
 | [agents-md-improver](./agents-md-improver) | 1.0.0 | Audit and improve `AGENTS.md` (shared by Claude, Codex, Gemini, …) |
+
+manage-context's report opens on **Where the baseline goes**: the tokens every session pays before you type anything.
+
+![manage-context report, Baseline tab: a treemap of a session's ~37k starting tokens by category (built-in tools, skills, MCP servers, system prompt), with summary cards above and module tabs on the left](./docs/manage-context-baseline.png)
 
 ## Writing & code
 

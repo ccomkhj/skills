@@ -2,8 +2,11 @@
 
 Verified against the Claude Code CLI 2.1.295 binary on 2026-10-09 (setting
 schema descriptions and the skill-state resolver); plugin-skill rules re-checked
-on 2.1.303 (2026-10-19). Re-check after a major CLI
-upgrade: `strings "$(readlink -f "$(which claude)")" | grep -o 'skillOverrides:()=>.\{400\}'`.
+on 2.1.303 (2026-10-19); skill roles, frontmatter lock, account skills and the
+`/skills` menu on 2.1.316 (2026-10-31), where `inventory.py` matched a live
+session's skill listing with 0 mismatches. Re-check after a major CLI
+upgrade: `strings "$(readlink -f "$(which claude)")" | grep -o 'function jAe(e){.\{700\}'`
+(the resolver) and `grep -o 'skillOverrides:()=>.\{400\}'` (the setting).
 
 ## Settings files and precedence
 
@@ -26,7 +29,19 @@ is why `apply_plan.py` re-reads it right before an atomic write.
 - `name-only`: listed without its description (saves the description).
 - `user-invocable-only`: hidden from the model, `/name` still works (saves the whole row).
 - `off`: hidden from both.
-- Absent means `on`.
+- Absent means `on`. Layers merge `global < project-shared < project`, so the highest
+  layer naming the skill wins. To turn a skill back **on** in one project while a
+  lower layer hides it, `on` must be written explicitly in `settings.local.json`;
+  deleting the key there would let the lower value through. `apply_plan.py` does this.
+- Frontmatter `disable-model-invocation: true` locks the skill at `user-invocable-only`
+  (the CLI's lock reason `author`): `on`/`name-only` overrides do nothing, `off` still
+  hides it. Frontmatter `user-invocable: false` is the reverse: model only, no `/name`.
+- Account skills (`anthropic-skills:*`, synced into `~/.claude/skills/synced/<org>/`
+  with a `manifest.json`) **do** honor `skillOverrides`. Evidence: `anthropic-skills:docx`
+  left the listing right after a project `off` (2026-10-19).
+- Claude Code's own `/skills` menu switches the same key but writes only
+  `localSettings` (this project's `settings.local.json`), and refuses locked skills
+  (plugin, frontmatter, policy/flag).
 - **Plugin skills (`plugin:skill`) ignore `skillOverrides`.** The resolver returns
   `on` for any skill whose source is a plugin. The scanner flags any override on a
   plugin skill as a mismatch. Two levers remain: disable the whole plugin, or add
@@ -34,8 +49,11 @@ is why `apply_plan.py` re-reads it right before an atomic write.
   plugin loader honours it). The frontmatter edit is outside this skill's scripts
   and is lost when the plugin updates or its owning app re-syncs, so offer it only
   as a manual step.
-- `disableBundledSkills: true` removes all bundled skills at once. That's too blunt
-  to offer per row, so it's mentioned here only.
+- `disableBundledSkills: true` removes all bundled skills and workflows; built-in
+  slash commands stay typable but are hidden from the model. That's too blunt to
+  offer per row, so it's mentioned here only. Overrides naming a bundled skill or
+  built-in command then match nothing on disk; the Skills panel lists them under
+  "settings for skills not on disk", next to overrides for removed skills.
 
 ## Plugins: `enabledPlugins`
 
@@ -52,8 +70,8 @@ is why `apply_plan.py` re-reads it right before an atomic write.
   e.g. one installed by another app) have no setting. They're report-only here;
   manually, use the frontmatter edit above or move the folder out of
   `~/.claude/skills/` (the owning app may restore it).
-- Plugins not found locally at all (e.g. `anthropic-skills:*`) come from the
-  claude.ai account. They're report-only.
+- A plugin that is installed but absent from `enabledPlugins` is off. Every installed
+  plugin gets a row in the report, so a disabled one can be switched on.
 
 ## MCP servers
 
