@@ -71,7 +71,7 @@ Five stages for a PM working on an existing Next.js/React app. Each runs alone; 
 | [socrates](./socrates) | 1.0.0 | Find a recurring belief in your past prompts and question it Socratically. `/socrates` |
 | [step-by-step](./step-by-step) | 1.0.0 | Explain a codebase or process as groups of blocks, each with a technical and a plain-language explanation |
 | [deassemble](./deassemble) | 1.3.0 | Like step-by-step, but actually runs the code and builds an interactive report from what it observed |
-| [ai-tutorial](./ai-tutorial) | 1.3.0 | Teach one AI/ML concept as an interactive HTML tutorial. `/ai-tutorial <concept>` |
+| [ai-tutorial](./ai-tutorial) | 1.6.0 | Teach an AI/ML concept or connected system as an interactive HTML lesson or walkthrough. `/ai-tutorial <concept>` |
 
 ## Skill & MCP hygiene
 

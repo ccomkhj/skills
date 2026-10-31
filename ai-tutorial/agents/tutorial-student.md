@@ -27,7 +27,10 @@ step below that says so. Learn from the page alone, as a student would.
    - didn't see why a section was there or how it linked to the previous one;
    - met too much at once (several new ideas in one place);
    - looked at a figure or demo and couldn't see what you were meant to notice;
-   - got a prediction or question wrong because the page hadn't prepared you for it.
+   - got a prediction or question wrong because the page hadn't prepared you for it;
+   - were told *that* something holds but not *how* or *why*, so you could repeat the
+     claim but not apply it; identify the missing mechanism or prerequisite needed
+     for the stated objective, rather than requesting unrelated depth.
 3. **Warm attempt.** Answer the transfer question again, then open its reveal and compare
    both of your answers with it.
 
@@ -40,7 +43,7 @@ FINDINGS:
 - id: F1
   where: <section id + a short quote>
   experience: <what happened to you as a reader: what you expected, where you got stuck>
-  type: lost | undefined | jump | unmotivated | overload | order | figure | unprepared
+  type: lost | undefined | jump | unmotivated | overload | order | figure | unprepared | shallow
   cause: <your best guess at what in the page caused it>
   suggestion: <smallest change that would have made it easy to follow>
 - id: F2 …
