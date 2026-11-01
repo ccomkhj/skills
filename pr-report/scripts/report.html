@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR report · {{TITLE}}</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--mut:#656d76;--line:#d0d7de;--card:#f6f8fa;--g:#1a7f37;--a:#9a6700;--r:#cf222e;--rb:#ffebe9}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8d96a0;--line:#30363d;--card:#161b22;--g:#3fb950;--a:#d29922;--r:#f85149;--rb:#2d1517}}
+*{box-sizing:border-box}body{margin:0 auto;max-width:1100px;padding:24px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:28px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:13px;margin:16px 0 6px;color:var(--mut)}
+a{color:inherit}.muted{color:var(--mut)}.meta{color:var(--mut);font-size:12px;margin:2px 0 16px}
+.banner{background:var(--card);border-left:3px solid var(--mut);padding:8px 12px;margin-bottom:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--line);border-radius:6px;padding:10px 12px}
+.card .lbl{font-size:12px;color:var(--mut)}.card .val{font-size:22px;font-weight:600;margin:2px 0}.card .sub{font-size:11px;color:var(--mut)}
+.card.g{border-top-color:var(--g)}.card.a{border-top-color:var(--a)}.card.r{border-top-color:var(--r)}.card.r .val{color:var(--r)}.card.na .val{color:var(--mut)}
+details{margin:6px 0}summary{cursor:pointer;padding:4px 0}.r-t{color:var(--r)}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.open{table-layout:fixed}table.open th{font-size:12px;color:var(--mut);font-weight:500}
+table.open th:nth-child(1){width:64px}table.open th:nth-child(3){width:72px}table.open th:nth-child(4){width:96px}table.open th:nth-child(5){width:150px}table.open th:nth-child(6){width:110px}table.open th:nth-child(7){width:80px}
+td.t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.r td.idle{color:var(--r);font-weight:600}tr.a td.idle{color:var(--a)}
+.chip{font-size:11px;padding:1px 6px;border-radius:10px;background:var(--rb);color:var(--r)}.sz{font-size:11px}
+table.kv th{width:420px;font-weight:500}.about{font-size:12px;font-weight:400;color:var(--mut);margin:2px 0 2px 16px}
+.take{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--g);border-radius:6px;padding:10px 14px;margin:0 0 16px}.take.a{border-left-color:var(--a)}.take.r{border-left-color:var(--r)}.take ul{margin:6px 0 0;padding-left:20px}.take li{margin:3px 0}.take li.r::marker{color:var(--r)}.take li.a::marker{color:var(--a)}.meta [class^=dot-]{margin:0 4px 0 10px}.meta [class^=dot-]:first-of-type{margin-left:0}
+[class^=dot-]{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--line)}
+.dot-g{background:var(--g)}.dot-a{background:var(--a)}.dot-r{background:var(--r)}
+.chart{width:100%;max-width:680px;height:auto;display:block}.chart .grid{stroke:var(--line)}.chart .tick{fill:var(--mut);font-size:10px}
+.chart .dot{fill:var(--fg);fill-opacity:.6}.chart .lbl{fill:var(--mut);font-size:10px}.chart .axis{fill:var(--mut);font-size:11px;font-weight:600}.chart .zone{fill:var(--r);font-size:10px}.cap{color:var(--mut);font-size:12px;max-width:680px;margin:4px 0 0}.chart .danger{fill:var(--rb)}.chart a:hover .dot{fill:var(--r);fill-opacity:1}
+.na-line{color:var(--mut);font-size:12px;margin-top:28px;border-top:1px solid var(--line);padding-top:8px}
+</style></head><body>
+<h1>PR report · {{TITLE}}</h1><div class="meta">{{META}}</div>
+{{TAKEAWAYS}}
+{{BANNER}}
+<div class="cards">{{CARDS}}</div>
+{{SECTIONS}}
+{{NA}}
+</body></html>

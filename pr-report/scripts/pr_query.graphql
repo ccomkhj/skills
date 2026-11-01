@@ -1,0 +1,42 @@
+# One page of PRs from GitHub search, with everything pr_report.py needs. Page size 25: larger pages
+# hit GitHub's ~10s server timeout (502s, or RESOURCE_LIMITS partial data with HTTP 200). No connection
+# nested inside reviews/timeline: that multiplies the cost ~10x. Per-check contexts (not the rollup state)
+# so the `pr-classify` verdict status isn't mistaken for CI.
+query($q: String!, $pageSize: Int = 25, $cursor: String) {
+  search(query: $q, type: ISSUE, first: $pageSize, after: $cursor) {
+    issueCount
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on PullRequest {
+      number title url isDraft state createdAt mergedAt closedAt updatedAt body
+      additions deletions baseRefName headRefName headRefOid mergeStateStatus reviewDecision
+      author { login __typename }
+      mergedBy { login }
+      reviews(first: 50) {
+        nodes { author { login __typename } state submittedAt commit { oid } }
+      }
+      reviewRequests(first: 20) {
+        nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } ... on Bot { login } ... on Mannequin { login } } }
+      }
+      timelineItems(first: 100, itemTypes: [READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]) {
+        nodes {
+          __typename
+          ... on ReadyForReviewEvent { createdAt }
+          ... on ConvertToDraftEvent { createdAt }
+          ... on ReviewRequestedEvent { createdAt requestedReviewer { __typename ... on User { login } ... on Team { slug } ... on Bot { login } } }
+          ... on HeadRefForcePushedEvent { createdAt }
+        }
+      }
+      comments(last: 5) { nodes { createdAt author { login __typename } } }
+      commits(last: 1) {
+        nodes { commit {
+          committedDate
+          statusCheckRollup { contexts(first: 50) { nodes {
+            __typename
+            ... on CheckRun { name status conclusion }
+            ... on StatusContext { context state description }
+          } } }
+        } }
+      }
+    } }
+  }
+}
