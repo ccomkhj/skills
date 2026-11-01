@@ -95,6 +95,7 @@ manage-context's report opens on **Where the baseline goes**: the tokens every s
 |-------|---------|-------------|
 | [humanizer](./humanizer) | 2.8.1 | Remove signs of AI-generated writing. Based on [blader/humanizer](https://github.com/blader/humanizer) |
 | [simplify-python](./simplify-python) | 1.0.0 | Make recent Python cleaner without changing behavior |
+| [pr-classify](./pr-classify) | 1.0.0 | After `/pr`, a fresh-context agent rates the PR safe to merge / nice to review / reject to merge; merges (and promotes dev → main) only after you approve |
 | [slack-comm](./slack-comm) | 3.0.0 | Turn the session's work into a short Slack report or request, saved as a draft. `/slack-comm` |
 
 ## Utilities
