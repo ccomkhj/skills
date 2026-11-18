@@ -1,393 +1,389 @@
-# pair-consult handoff and human-intervention helpers.
+# pair-consult helpers. Source this file, don't read it: every helper prints what to do next.
 #
-# Source once:
-#   source ~/.claude/skills/pair-consult/reference/handoff.sh   # Claude Code
-#   source ~/.agents/skills/pair-consult/reference/handoff.sh   # Codex
+#   source <skill-dir>/reference/handoff.sh      (bash or zsh, cwd = repo root)
 #
-# Functions provided (all expect cwd at the repo root with .consult/ present):
+# Orchestrator (A):
+#   consult_init <me> <peer> [rounds] [effort]   create .consult/ and STATE.md
+#   consult_handoff [--fresh]                    start B's next round (resumes B's session unless --fresh)
+#   consult_wait [--timeout s] [--interval s]    block until B's round lands, then print its digest
+#   consult_close                                final round written -> STATUS: AWAITING_USER
+#   consult_digest <N>                           terse summary of .consult/R<N>.md for chat
+#   consult_status | consult_takeover | consult_resume [--fresh]
+# Human, second terminal:
+#   consult_watch | consult_inject "<note>"
 #
-#   Agent-side (called inside a round):
-#     consult_handoff <peer>        — fire the peer headless, log to .consult/round-N-<peer>.log
-#                                      AND append to .consult/session.log for live tailing.
-#     consult_wait                  — block until STATE.md flips off 'WAITING: <peer>'.
-#                                      MUST be called after consult_handoff (the nohup'd peer
-#                                      is invisible to the Claude-Code harness, so without
-#                                      this poll the agent has no way to learn the peer is
-#                                      done). In Claude Code, invoke via Bash with
-#                                      run_in_background=true so the harness notifies the
-#                                      agent the instant the wait returns.
-#     consult_peer_status <peer>    — list running peer PIDs (do NOT killall by name).
+# .consult/STATE.md is written only by these helpers:
+#   STATUS: WAITING: <cli> | AWAITING_USER | BLOCKED: <reason>    <cli> owes round ROUND
+#   ROUND:  the round being worked on
+#   ROUNDS: round cap, odd and >= 3, so A both proposes and synthesizes
+#   A / B:  orchestrator CLI / reviewer CLI (claude | codex), fixed for the session
+#   EFFORT: reviewer reasoning effort (high | xhigh)
 #
-#   Human-side:
-#     consult_watch                 — tail -F .consult/session.log. Survives round boundaries.
-#     consult_status                — terse one-screen summary: STATE.md + last 20 log lines.
-#     consult_inject "<note>"       — append a USER_NOTE block to .consult/USER_NOTES.md.
-#                                      Next agent must address it before their main action.
-#     consult_takeover              — kill running peer by PID (via lsof on log files),
-#                                      set STATUS: BLOCKED: human-takeover.
-#     consult_resume <peer>         — set STATUS: WAITING: <peer>, fire consult_handoff.
-#                                      Does NOT increment ROUND — manual takeovers don't add rounds.
-#     consult_digest <N>            — print a terse 5-15 line summary of .consult/R<N>.md
-#                                      (agreements + critique titles + verdict). Used by
-#                                      the active agent to relay round content into chat.
-#
-# See SKILL.md's Hazards table for the bugs these functions guard against (claude
-# flag-order, --add-dir variadic eating prompt, killall, --bare auth). Function
-# bodies have inline comments explaining each fix at the point it's applied.
+# B never touches STATE.md. It writes .consult/R<ROUND>.md and exits; consult_wait sees the
+# exit and advances the state. One writer, so two instances cannot collide on the file.
 
-# ---------- agent-side ----------
+_CONSULT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
 
-consult_handoff() {
-  local peer="$1"
-  case "$peer" in
-    codex|claude) ;;
-    *) echo "consult_handoff: peer must be 'codex' or 'claude' (got '$peer')" >&2; return 2 ;;
-  esac
+_consult_get() {
+  awk -v k="$1" 'index($0, k ":") == 1 {
+    sub(/^[^:]*:[[:space:]]*/, ""); sub(/[[:space:]]*(#.*)?$/, ""); print; exit
+  }' .consult/STATE.md
+}
 
-  if [[ ! -f .consult/STATE.md ]]; then
-    echo "consult_handoff: no .consult/STATE.md in $(pwd)" >&2
+_consult_set() {
+  awk -v k="$1" -v v="$2" 'index($0, k ":") == 1 && !done { print k ": " v; done = 1; next } { print }' \
+    .consult/STATE.md > .consult/STATE.md.tmp && mv .consult/STATE.md.tmp .consult/STATE.md
+}
+
+# Guard shared by every orchestrator verb. A reviewer that handed off would spawn a second
+# orchestrator racing the live one, so the peer process is marked and refused here.
+_consult_guard() {
+  if [[ -n "${PAIR_CONSULT_PEER:-}" ]]; then
+    echo "$1: you are the reviewer. Write your .consult/R<round>.md and exit; the orchestrator advances the session." >&2
+    return 6
+  fi
+  if [[ "$1" != consult_init && ! -f .consult/STATE.md ]]; then
+    echo "$1: no .consult/STATE.md in $(pwd). Run from the repo root, or start with consult_init." >&2
     return 2
   fi
+}
 
-  # Guard against firing with a stale STATE: STATE.md must say WAITING: <peer>
-  # before we invoke. Catches the bug where the agent forgets to flip STATE
-  # after writing their round.
-  # The trailing sub() strips inline '# ...' comments and whitespace, so a
-  # STATE.md copied verbatim from the file-formats template still parses.
-  local state_status
-  state_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .consult/STATE.md)
-  if [[ "$state_status" != "WAITING: $peer" ]]; then
-    echo "consult_handoff: STATE.md says STATUS='$state_status' but you're handing off to '$peer'." >&2
-    echo "                 Update STATE.md first: 'STATUS: WAITING: $peer', then retry." >&2
-    return 5
+_consult_peer_alive() {
+  local pid=""
+  [[ -f .consult/peer.pid ]] && pid=$(cat .consult/peer.pid)
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+# ---------- orchestrator ----------
+
+consult_init() {
+  _consult_guard consult_init || return
+  local me="${1:-}" peer="${2:-}" rounds="${3:-5}" effort="${4:-high}"
+  case "$me:$peer" in
+    claude:codex|codex:claude) ;;
+    *) echo "consult_init: usage: consult_init <me> <peer> [rounds] [effort]; me/peer are claude and codex, one each" >&2; return 2 ;;
+  esac
+  case "$rounds" in ''|*[!0-9]*) echo "consult_init: rounds must be a number (got '$rounds')" >&2; return 2 ;; esac
+  case "$effort" in high|xhigh) ;; *) echo "consult_init: effort must be high or xhigh (got '$effort')" >&2; return 2 ;; esac
+  if [[ -f .consult/STATE.md ]]; then
+    echo "consult_init: .consult/ already holds a session ($(_consult_get STATUS), round $(_consult_get ROUND))." >&2
+    echo "              Resume it, or ask the user before 'rm -rf .consult' for a fresh start." >&2
+    return 2
   fi
-
   if ! command -v "$peer" >/dev/null 2>&1; then
-    echo "consult_handoff: peer CLI '$peer' not on PATH — write STATUS: BLOCKED and surface to the user" >&2
+    echo "consult_init: peer CLI '$peer' is not on PATH. Tell the user; no consult without a reviewer." >&2
     return 3
   fi
 
-  local round
-  round=$(awk '/^ROUND:/ {print $2; exit}' .consult/STATE.md)
-  if [[ -z "$round" ]]; then
-    echo "consult_handoff: couldn't parse 'ROUND:' line from .consult/STATE.md" >&2
+  local asked="$rounds"
+  (( rounds < 3 )) && rounds=3
+  (( rounds % 2 == 0 )) && rounds=$((rounds + 1))
+  if [[ "$asked" != "$rounds" ]]; then
+    echo "consult_init: $asked rounds can't start and end on A (propose ... synthesize); using a $rounds-round cap. Tell the user."
+  fi
+
+  mkdir -p .consult
+  # Local ignore, so the session never shows up in the diff B reviews or in a commit.
+  local exclude
+  if exclude=$(git rev-parse --git-path info/exclude 2>/dev/null) && ! git check-ignore -q .consult 2>/dev/null; then
+    mkdir -p "$(dirname "$exclude")" && echo ".consult/" >> "$exclude"
+  fi
+
+  cat > .consult/STATE.md <<EOF
+# pair-consult state (written by handoff.sh helpers only)
+STATUS: WAITING: $me
+ROUND: 1
+ROUNDS: $rounds
+A: $me
+B: $peer
+EFFORT: $effort
+EOF
+  echo "consult_init: session ready. A=$me, B=$peer, $rounds-round cap, effort $effort."
+  echo "consult_init: NEXT: write .consult/QUESTION.md and .consult/R1.md, then consult_handoff."
+}
+
+consult_handoff() {
+  _consult_guard consult_handoff || return
+  local fresh=0 arg
+  for arg in "$@"; do
+    case "$arg" in
+      --fresh) fresh=1 ;;
+      *) echo "consult_handoff: usage: consult_handoff [--fresh]" >&2; return 2 ;;
+    esac
+  done
+
+  local a b round rounds effort cur
+  a=$(_consult_get A); b=$(_consult_get B)
+  round=$(_consult_get ROUND); rounds=$(_consult_get ROUNDS); effort=$(_consult_get EFFORT)
+  cur=$(_consult_get STATUS)
+  if [[ -z "$round" || -z "$rounds" || -z "$effort" ]]; then
+    echo "consult_handoff: STATE.md is missing one of ROUND, ROUNDS, EFFORT." >&2
     return 2
   fi
-
-  # Total rounds for this session. Defaults to 5 for back-compat with any
-  # STATE.md written before the ROUNDS: field existed. Forced odd at init so
-  # the final round always lands on A (the synthesizer); see SKILL.md.
-  local rounds
-  rounds=$(awk '/^ROUNDS:/ {print $2; exit}' .consult/STATE.md)
-  rounds=${rounds:-5}
-
-  # Reasoning effort for the peer. Written once at init from --model; when
-  # STATE.md leaves it empty we fall back to the skill default (high) rather
-  # than each CLI's own default, so a peer round is always deep.
-  local effort
-  effort=$(awk '/^EFFORT:/ {print $2; exit}' .consult/STATE.md)
-  effort=${effort:-high}
-
-  if (( round < 1 || round > rounds )); then
-    echo "consult_handoff: ROUND=$round out of range; the loop has only $rounds rounds." >&2
-    return 2
+  case "$a:$b" in
+    claude:codex|codex:claude) ;;
+    *) echo "consult_handoff: STATE.md needs A and B to be claude and codex, one each (got A='$a', B='$b')." >&2; return 2 ;;
+  esac
+  if _consult_peer_alive; then
+    echo "consult_handoff: a reviewer is already running (pid $(cat .consult/peer.pid)). Run consult_wait instead." >&2
+    return 5
   fi
 
-  if (( round == rounds )); then
-    echo "consult_handoff: R$rounds is the final round — do NOT invoke the peer." >&2
-    echo "                  Set STATUS: AWAITING_USER in STATE.md and surface to the user." >&2
-    return 4
-  fi
-
-  local logfile=".consult/round-${round}-${peer}.log"
-  local session_log=".consult/session.log"
-  local prompt="Resume the pair-consult skill. Read .consult/STATE.md and continue from STATUS: WAITING: ${peer}."
-
-  {
-    echo
-    echo "=== R${round} ${peer} === $(date '+%Y-%m-%d %H:%M:%S')"
-  } | tee -a "$logfile" >> "$session_log"
-
-  # stdbuf -oL forces line-buffered stdout so logs appear incrementally.
-  local buf=()
-  if command -v stdbuf >/dev/null 2>&1; then
-    buf=(stdbuf -oL -eL)
-  fi
-
-  # Per-CLI effort flag. codex takes it as a config override
-  # (-c model_reasoning_effort=...); claude has a first-class --effort. Both
-  # accept high|xhigh verbatim.
-  local codex_effort=() claude_effort=()
-  if [[ -n "$effort" ]]; then
-    codex_effort=(-c "model_reasoning_effort=$effort")
-    claude_effort=(--effort "$effort")
-  fi
-
-  # Model the codex peer runs on. Pinned here so the peer doesn't drift with
-  # ~/.codex/config.toml; override per-shell with PAIR_CONSULT_CODEX_MODEL.
-  local codex_model="${PAIR_CONSULT_CODEX_MODEL:-gpt-6-astra}"
-
-  case "$peer" in
-    codex)
-      ( nohup "${buf[@]}" codex exec \
-          -s workspace-write \
-          -m "$codex_model" \
-          "${codex_effort[@]}" \
-          -C "$(pwd)" \
-          --skip-git-repo-check \
-          "$prompt" 2>&1 \
-        | tee -a "$logfile" >> "$session_log" ) &
+  local flip=0
+  case "$cur" in
+    "WAITING: $a")
+      if (( round >= rounds )); then
+        echo "consult_handoff: round $round is the final round and it is yours. Write .consult/R${rounds}.md, then consult_close." >&2
+        return 4
+      fi
+      if [[ ! -s ".consult/R${round}.md" ]]; then
+        echo "consult_handoff: write .consult/R${round}.md first; B reviews that file." >&2
+        return 5
+      fi
+      round=$((round + 1)); flip=1
       ;;
-    claude)
-      # flags before prompt; `--` terminates the variadic --add-dir so the
-      # prompt isn't parsed as another directory. --effort must stay before --.
-      ( nohup "${buf[@]}" claude -p \
-          --dangerously-skip-permissions \
-          "${claude_effort[@]}" \
-          --add-dir "$(pwd)" \
-          -- \
-          "$prompt" 2>&1 \
-        | tee -a "$logfile" >> "$session_log" ) &
+    "WAITING: $b") ;;   # B owes this round already: retry after a failed round, or consult_resume
+    *)
+      echo "consult_handoff: STATUS is '$cur'; nothing to hand off." >&2
+      return 5
       ;;
   esac
 
-  local pid=$!
-  disown
+  # The last B round re-reviews A's answers; it only exists when an A response precedes it.
+  local kind="review"
+  (( rounds >= 5 && round == rounds - 1 )) && kind="re-review"
 
-  local shown_model="$peer"
-  [[ "$peer" == codex ]] && shown_model="$codex_model"
-  echo "consult_handoff: invoked $peer ($shown_model, effort $effort) for round $round (pid $pid, log $logfile, live: consult_watch)"
-  echo "consult_handoff: NEXT — call 'consult_wait' (Bash run_in_background=true in Claude Code)."
-  echo "                 The peer is nohup'd and invisible to the harness; without consult_wait you will idle."
+  # Resume B's own session when it has one: it already holds the question, the code it read
+  # and its own critiques, so a later round costs a fraction of a cold start.
+  # Only once B has finished a round, so a retry of a failed first round starts clean.
+  local sid=""
+  if (( ! fresh && round > 2 )) && [[ -f .consult/session.log ]]; then
+    sid=$(awk '/^session id: / { id = $3 } END { print id }' .consult/session.log)
+  fi
+
+  local files=".consult/QUESTION.md" i
+  for (( i = 1; i < round; i++ )); do
+    [[ -f ".consult/R${i}.md" ]] && files="$files, .consult/R${i}.md"
+  done
+  local notes=""
+  [[ -f .consult/USER_NOTES.md ]] && notes=" Then .consult/USER_NOTES.md."
+
+  # Same brief for a cold start and a resumed session; only the reading list differs. The
+  # last sentence stops the reviewer CLI from loading this skill by name: SKILL.md is the
+  # orchestrator's document and costs the reviewer a few thousand tokens for nothing.
+  local reading="Read ${files}."
+  [[ -n "$sid" ]] && reading="A's latest round is .consult/R$((round - 1)).md: read it, and re-check any code or evidence A changed."
+  local prompt="pair-consult round ${round} of ${rounds}: a ${kind}. ${reading}${notes} Write .consult/R${round}.md. Your brief follows and is complete: work from it and these files, without loading any skill.
+
+$(cat "$_CONSULT_HOME/peer.md")"
+
+  if (( flip )); then
+    _consult_set ROUND "$round"
+    _consult_set STATUS "WAITING: $b"
+  fi
+
+  local logfile=".consult/round-${round}-${b}.log" session_log=".consult/session.log"
+  { echo; echo "=== R${round} ${b} (${kind}) === $(date '+%Y-%m-%d %H:%M:%S')"; } | tee -a "$logfile" >> "$session_log"
+
+  # stdbuf -oL forces line-buffered stdout so the log is live.
+  local buf=()
+  command -v stdbuf >/dev/null 2>&1 && buf=(stdbuf -oL -eL)
+
+  # Codex model is pinned so the reviewer doesn't drift with ~/.codex/config.toml.
+  local codex_model="${PAIR_CONSULT_CODEX_MODEL:-gpt-6-astra}" how="cold start"
+  [[ -n "$sid" ]] && how="resumed session $sid"
+
+  # nohup + & detaches the reviewer so it survives this shell; consult_wait is what the
+  # harness tracks. stdin is /dev/null because codex appends piped stdin to the prompt.
+  case "$b" in
+    codex)
+      if [[ -n "$sid" ]]; then
+        # resume takes the cwd from this shell; model and sandbox must be re-asserted.
+        ( PAIR_CONSULT_PEER=1 nohup "${buf[@]}" codex exec resume \
+            --skip-git-repo-check \
+            -m "$codex_model" \
+            -c "model_reasoning_effort=$effort" \
+            -c 'sandbox_mode="workspace-write"' \
+            "$sid" "$prompt" </dev/null 2>&1 \
+          | tee -a "$logfile" >> "$session_log" ) &
+      else
+        ( PAIR_CONSULT_PEER=1 nohup "${buf[@]}" codex exec \
+            -s workspace-write \
+            -m "$codex_model" \
+            -c "model_reasoning_effort=$effort" \
+            -C "$(pwd)" \
+            --skip-git-repo-check \
+            "$prompt" </dev/null 2>&1 \
+          | tee -a "$logfile" >> "$session_log" ) &
+      fi
+      ;;
+    claude)
+      # Flags go before the prompt (after it they hang the CLI), and `--` ends the variadic
+      # --add-dir so the prompt isn't parsed as a directory. No --bare: it breaks auth.
+      local session_flag=(--resume "$sid")
+      if [[ -z "$sid" ]]; then
+        sid=$(uuidgen | tr 'A-Z' 'a-z')
+        session_flag=(--session-id "$sid")
+        echo "session id: $sid" | tee -a "$logfile" >> "$session_log"
+      fi
+      ( PAIR_CONSULT_PEER=1 nohup "${buf[@]}" claude -p \
+          --dangerously-skip-permissions \
+          --effort "$effort" \
+          "${session_flag[@]}" \
+          --add-dir "$(pwd)" \
+          -- \
+          "$prompt" </dev/null 2>&1 \
+        | tee -a "$logfile" >> "$session_log" ) &
+      ;;
+  esac
+  echo $! > .consult/peer.pid
+  disown 2>/dev/null
+
+  local shown="$b"
+  [[ "$b" == codex ]] && shown="$b $codex_model"
+  echo "consult_handoff: round $round ($kind) -> $shown, effort $effort, $how. Log: $logfile"
+  echo "consult_handoff: NEXT: consult_wait (in Claude Code: Bash with run_in_background=true, then end your turn)."
 }
 
-# consult_wait — block until STATE.md flips off 'WAITING: <peer>'.
-#
-# Why this exists: consult_handoff fires the peer via `nohup ... &`, which
-# detaches it from the Claude-Code harness's process tracking. The harness
-# therefore has no way to surface "peer is done" to the active agent — the
-# agent would sit idle until the user happens to ping (which triggers a
-# file-change reminder) or a manual ScheduleWakeup fires.
-#
-# consult_wait closes that gap by polling .consult/STATE.md. When invoked via
-# Bash with run_in_background=true (Claude Code), the harness DOES track the
-# wait-process, so the agent gets notified the instant this function returns.
-# In Codex CLI or other contexts without run_in_background, call inline — it
-# blocks the current turn until the peer's round lands (or timeout).
-#
-# Usage:
-#   consult_wait                    # default: 5s poll, 540s max wait
-#   consult_wait --interval 3
-#   consult_wait --timeout 300
-#
-# Exit codes:
-#   0  STATUS changed off 'WAITING: <peer>' — your turn (or session done/blocked).
-#   2  Timed out. Re-invoke, or run consult_status to investigate.
-#   3  Peer process died without writing the round file (lsof+mtime heuristic).
+# Exit codes: 0 B's round landed, your turn. 2 timed out, B still running: run consult_wait again.
+#             3 B exited without writing its round: read the log tail, then consult_handoff again.
 consult_wait() {
-  local interval=5
-  local timeout=540
+  _consult_guard consult_wait || return
+  local interval=5 timeout=540
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --interval) interval="$2"; shift 2 ;;
       --timeout)  timeout="$2";  shift 2 ;;
-      -h|--help)
-        echo "Usage: consult_wait [--interval SECONDS] [--timeout SECONDS]"
-        return 0
-        ;;
-      *) echo "consult_wait: unknown arg '$1'" >&2; return 2 ;;
+      *) echo "consult_wait: usage: consult_wait [--interval s] [--timeout s]" >&2; return 2 ;;
     esac
   done
 
-  if [[ ! -f .consult/STATE.md ]]; then
-    echo "consult_wait: no .consult/STATE.md in $(pwd)" >&2
-    return 2
-  fi
-
-  # Use awk to both detect and extract — keeps the function portable across
-  # bash and zsh (zsh has no BASH_REMATCH, and `status` is a read-only
-  # special variable, so we use `cur_status` below). Trailing sub() strips
-  # inline '# ...' comments so template-faithful STATE.md files parse.
-  local initial peer
-  initial=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .consult/STATE.md)
-  peer=$(awk '/^STATUS:[[:space:]]*WAITING:/ {sub(/^STATUS:[[:space:]]*WAITING:[[:space:]]*/,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .consult/STATE.md)
-  if [[ -z "$peer" ]]; then
-    echo "consult_wait: STATUS is '$initial' (not 'WAITING: <peer>'). Nothing to wait for — act now."
+  local a b round cur
+  a=$(_consult_get A); b=$(_consult_get B); round=$(_consult_get ROUND)
+  cur=$(_consult_get STATUS)
+  if [[ "$cur" != "WAITING: $b" ]]; then
+    echo "consult_wait: STATUS is '$cur'; nothing to wait for."
     return 0
   fi
-
-  local round
-  round=$(awk '/^ROUND:/ {print $2; exit}' .consult/STATE.md)
-  local round_log=".consult/round-${round}-${peer}.log"
-
-  echo "consult_wait: polling STATE.md every ${interval}s for status change off 'WAITING: ${peer}' (timeout ${timeout}s)..."
-
-  local elapsed=0
-  while (( elapsed < timeout )); do
-    sleep "$interval"
-    elapsed=$((elapsed + interval))
-
-    # Init to "" — declaring a bare `local` inside a loop causes zsh to print
-    # the variable each iteration (zsh's `local` is `typeset`, which echoes
-    # parameter state in some forms).
-    local cur_status=""
-    cur_status=$(awk '/^STATUS:/ {sub(/^STATUS: */,""); sub(/[[:space:]]*(#.*)?$/,""); print; exit}' .consult/STATE.md 2>/dev/null)
-    if [[ "$cur_status" != "WAITING: $peer" ]]; then
-      echo "consult_wait: STATUS is now '$cur_status' after ${elapsed}s — your turn."
-      return 0
-    fi
-
-    # Crash heuristic: after a few polls, if no process holds the round log
-    # open AND the file hasn't been touched in 3*interval seconds, the peer
-    # likely died (segfault, OOM, network drop on `claude -p`, etc.).
-    if (( elapsed >= interval * 3 )) && [[ -f "$round_log" ]] && command -v lsof >/dev/null 2>&1; then
-      if ! lsof -t "$round_log" >/dev/null 2>&1; then
-        local log_mtime now stale
-        log_mtime=$(stat -f %m "$round_log" 2>/dev/null || stat -c %Y "$round_log" 2>/dev/null)
-        now=$(date +%s)
-        stale=$((now - log_mtime))
-        if (( stale > interval * 3 )); then
-          echo "consult_wait: no process writing $round_log and last write was ${stale}s ago — peer may have died." >&2
-          echo "              Run 'consult_status' / 'consult_peer_status ${peer}' to investigate." >&2
-          return 3
-        fi
-      fi
-    fi
-  done
-
-  echo "consult_wait: timed out after ${timeout}s (STATUS still 'WAITING: ${peer}'). Re-run consult_wait or check 'consult_status'." >&2
-  return 2
-}
-
-consult_peer_status() {
-  local peer="${1:-}"
-  case "$peer" in
-    codex|claude) ;;
-    *) echo "consult_peer_status: peer must be 'codex' or 'claude'" >&2; return 2 ;;
-  esac
-  echo "consult_peer_status: running $peer processes (do NOT killall by name):"
-  ps -axo pid,etime,command | grep -E "[ /]${peer}([[:space:]]|$)" | grep -v 'consult_peer_status' || echo "  (none)"
-}
-
-# ---------- human-side ----------
-
-consult_watch() {
-  if [[ ! -d .consult ]]; then
-    echo "consult_watch: no .consult/ in $(pwd)" >&2
+  if [[ ! -f .consult/peer.pid ]]; then
+    echo "consult_wait: no reviewer was started for round $round. Run consult_handoff first." >&2
     return 2
   fi
+
+  local elapsed=0
+  while :; do
+    cur=$(_consult_get STATUS)
+    if [[ "$cur" != "WAITING: $b" ]]; then
+      echo "consult_wait: STATUS changed to '$cur' after ${elapsed}s."
+      return 0
+    fi
+    if ! _consult_peer_alive; then
+      if [[ -s ".consult/R${round}.md" ]]; then
+        _consult_set ROUND "$((round + 1))"
+        _consult_set STATUS "WAITING: $a"
+        echo "consult_wait: $b finished round $round after ${elapsed}s. Round $((round + 1)) is yours. Read .consult/R${round}.md."
+        consult_digest "$round"
+        return 0
+      fi
+      echo "consult_wait: $b exited without writing .consult/R${round}.md. Tail of .consult/round-${round}-${b}.log:" >&2
+      tail -15 ".consult/round-${round}-${b}.log" >&2
+      echo "consult_wait: fix the cause, then consult_handoff again (add --fresh if the resumed session is the problem)." >&2
+      return 3
+    fi
+    if (( elapsed >= timeout )); then
+      echo "consult_wait: $b is still working on round $round after ${timeout}s. Run consult_wait again." >&2
+      return 2
+    fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+  done
+}
+
+consult_close() {
+  _consult_guard consult_close || return
+  local rounds cur
+  rounds=$(_consult_get ROUNDS); cur=$(_consult_get STATUS)
+  if [[ "$cur" != "WAITING: $(_consult_get A)" ]]; then
+    echo "consult_close: STATUS is '$cur'; only the orchestrator's own turn can close the session." >&2
+    return 5
+  fi
+  if [[ ! -s ".consult/R${rounds}.md" ]]; then
+    echo "consult_close: write the synthesis to .consult/R${rounds}.md first (always the last round number, even on an early exit)." >&2
+    return 5
+  fi
+  _consult_set ROUND "$rounds"
+  _consult_set STATUS "AWAITING_USER"
+  echo "consult_close: STATUS: AWAITING_USER. Present .consult/R${rounds}.md to the user and stop."
+}
+
+# ---------- human ----------
+
+consult_status() {
+  _consult_guard consult_status || return
+  grep -E '^(STATUS|ROUND|ROUNDS|A|B|EFFORT):' .consult/STATE.md
+  if _consult_peer_alive; then echo "reviewer: running (pid $(cat .consult/peer.pid))"; else echo "reviewer: not running"; fi
+  if [[ -f .consult/USER_NOTES.md ]]; then
+    echo "--- user notes ---"
+    grep -E '^(## N|\*\*Status)' .consult/USER_NOTES.md
+  fi
+  if [[ -s .consult/session.log ]]; then
+    echo "--- last 20 lines of session.log ---"
+    tail -20 .consult/session.log
+  fi
+}
+
+consult_watch() {
+  _consult_guard consult_watch || return
   touch .consult/session.log
-  echo "consult_watch: tailing .consult/session.log (Ctrl-C to exit)"
-  echo "consult_watch: current state:"
-  grep -E '^(STATUS|ROUND|ROUNDS|A|B):' .consult/STATE.md 2>/dev/null | sed 's/^/  /'
-  echo "--- live feed ---"
   tail -F .consult/session.log
 }
 
-consult_status() {
-  if [[ ! -f .consult/STATE.md ]]; then
-    echo "consult_status: no .consult/STATE.md in $(pwd)" >&2
-    return 2
-  fi
-  echo "=== state ==="
-  grep -E '^(STATUS|ROUND|ROUNDS|A|B):' .consult/STATE.md | sed 's/^/  /'
-  echo
-  echo "=== user notes (mid-flight) ==="
-  local notes=""
-  if [[ -f .consult/USER_NOTES.md ]]; then
-    notes=$(grep -E '^## N' .consult/USER_NOTES.md 2>/dev/null || true)
-  fi
-  if [[ -n "$notes" ]]; then
-    echo "$notes" | sed 's/^/  /'
-  else
-    echo "  (none)"
-  fi
-  echo
-  echo "=== last 20 lines of session.log ==="
-  if [[ -s .consult/session.log ]]; then
-    tail -20 .consult/session.log | sed 's/^/  /'
-  else
-    echo "  (no session activity yet)"
-  fi
-}
-
+# A steer for whichever agent acts next. From inside Claude Code, just tell the orchestrator.
 consult_inject() {
-  local msg="$*"
+  _consult_guard consult_inject || return
+  local msg="$*" notes=".consult/USER_NOTES.md"
   if [[ -z "$msg" ]]; then
     echo "consult_inject: usage: consult_inject \"<note for the agents>\"" >&2
     return 2
   fi
-  if [[ ! -d .consult ]]; then
-    echo "consult_inject: no .consult/ in $(pwd)" >&2
-    return 2
-  fi
-
-  local notes_file=".consult/USER_NOTES.md"
-  if [[ ! -f "$notes_file" ]]; then
-    {
-      echo "# User notes (mid-flight)"
-      echo
-    } > "$notes_file"
-  fi
-
-  local next_n
-  next_n=$(grep -oE '^## N[0-9]+' "$notes_file" | sed 's/^## N//' | sort -n | tail -1)
-  next_n=$((${next_n:-0} + 1))
-
-  local round=""
-  if [[ -f .consult/STATE.md ]]; then
-    round=$(awk '/^ROUND:/ {print $2; exit}' .consult/STATE.md)
-  fi
-
+  [[ -f "$notes" ]] || echo "# User notes" > "$notes"
+  local n
+  n=$(( $(grep -c '^## N' "$notes") + 1 ))
   {
     echo
-    echo "## N${next_n} (added at $(date '+%Y-%m-%d %H:%M:%S'), during R${round:-?})"
-    echo "${msg}"
+    echo "## N${n} ($(date '+%Y-%m-%d %H:%M:%S'), during round $(_consult_get ROUND))"
+    echo "$msg"
     echo "**Status:** unaddressed"
-  } >> "$notes_file"
-
-  echo "consult_inject: added N${next_n} to $notes_file"
-  echo "                next agent must address it before their round."
+  } >> "$notes"
+  echo "consult_inject: added N${n}. The next agent to act answers it; A marks it addressed."
 }
 
+# Stops this session's reviewer only. Never pkill/killall by name: that kills the user's own CLI.
 consult_takeover() {
-  if [[ ! -d .consult ]]; then
-    echo "consult_takeover: no .consult/ in $(pwd)" >&2
-    return 2
+  _consult_guard consult_takeover || return
+  if ! _consult_peer_alive; then
+    echo "consult_takeover: no reviewer running; nothing to take over."
+    return 0
   fi
-
-  local pids=""
-  if command -v lsof >/dev/null 2>&1; then
-    pids=$(lsof -t .consult/round-*.log 2>/dev/null | sort -u)
-  fi
-
-  if [[ -z "$pids" ]]; then
-    echo "consult_takeover: no peer process currently writing to .consult/round-*.log"
-  else
-    echo "consult_takeover: stopping peer PIDs: $pids"
-    kill $pids 2>/dev/null
-    sleep 1
-    for p in $pids; do
-      if kill -0 "$p" 2>/dev/null; then
-        echo "consult_takeover: PID $p still alive, sending SIGKILL"
-        kill -9 "$p" 2>/dev/null
-      fi
-    done
-  fi
-
-  if [[ -f .consult/STATE.md ]]; then
-    sed -i.bak 's/^STATUS: .*/STATUS: BLOCKED: human-takeover/' .consult/STATE.md
-    rm -f .consult/STATE.md.bak
-    echo "consult_takeover: set STATUS: BLOCKED: human-takeover in .consult/STATE.md"
-  fi
-
-  echo "consult_takeover: the loop is paused. Work directly, then 'consult_resume <peer>' when ready."
+  local pid
+  pid=$(cat .consult/peer.pid)
+  pkill -P "$pid" 2>/dev/null
+  kill "$pid" 2>/dev/null
+  _consult_set STATUS "BLOCKED: human-takeover"
+  echo "consult_takeover: stopped the reviewer (pid $pid). STATUS: BLOCKED: human-takeover."
+  echo "consult_takeover: work directly, then consult_resume to rerun B's round."
 }
 
-# consult_digest <round-number> — print a terse 5-15 line summary of an R<N>.md
-# for the agent to relay into chat. Extracts agreement bullets and critique
-# titles; skips the full body. Use after each round completes to keep the
-# user in the loop without forcing them to cat the file.
+consult_resume() {
+  _consult_guard consult_resume || return
+  _consult_set STATUS "WAITING: $(_consult_get B)"
+  consult_handoff "$@"
+}
+
+# ---------- digest ----------
+
+# consult_digest <N>: terse summary of .consult/R<N>.md for chat. Parses the headings in peer.md
+# and file-formats.md, so a template heading change needs a matching change here.
 consult_digest() {
   local n="$1"
   if [[ -z "$n" || ! "$n" =~ ^[1-9][0-9]*$ ]]; then
@@ -405,10 +401,10 @@ consult_digest() {
 
   echo "=== R${n} digest ($(head -1 "$f" | sed 's/^# //')) ==="
 
-  # Agreements: bullets under "## Where A/B is right" or "## Agreed*"
+  # Agreements: bullets under "## Where A is right"
   local agreed
   agreed=$(awk '
-    /^## (Where [AB] is right|Agreed)/ { in_block=1; next }
+    /^## Where A is right/ { in_block=1; next }
     /^## / && in_block { in_block=0 }
     in_block && /^- / { print }
   ' "$f" 2>/dev/null || true)
@@ -430,8 +426,7 @@ consult_digest() {
     echo "$titles" | sed 's/^/  /' | _trunc
   fi
 
-  # Per-critique verdicts. Handles both R3 (`**Verdict:** agree|partial|object`)
-  # and R4 (`**B's verdict:** accept|double down`).
+  # Per-critique verdicts: A's response (`**Verdict:**`) and B's re-review (`**B's verdict:**`).
   local verdicts
   verdicts=$(awk '
     /^## C[0-9]+/ { c=$0; sub(/^## /,"",c); sub(/ —.*/,"",c); sub(/ -.*/,"",c); next }
@@ -447,10 +442,10 @@ consult_digest() {
     echo "$verdicts" | sed 's/^/  /' | _trunc
   fi
 
-  # Overall verdict (R4 closer)
+  # Overall verdict (re-review)
   local overall
   overall=$(awk '
-    /^## (Overall verdict|Verdict overall)/ { in_v=1; next }
+    /^## Overall verdict/ { in_v=1; next }
     /^## / && in_v { in_v=0 }
     in_v && NF > 0 { print; exit }
   ' "$f" 2>/dev/null || true)
@@ -459,25 +454,4 @@ consult_digest() {
   fi
 
   unset -f _trunc
-}
-
-consult_resume() {
-  local peer="$1"
-  case "$peer" in
-    codex|claude) ;;
-    *) echo "consult_resume: usage: consult_resume <codex|claude>" >&2; return 2 ;;
-  esac
-  if [[ ! -f .consult/STATE.md ]]; then
-    echo "consult_resume: no .consult/STATE.md in $(pwd)" >&2
-    return 2
-  fi
-
-  # Unlike pair_resume, we do NOT bump ROUND — manual takeovers stay within
-  # the current round. If you want to advance a round manually, edit STATE.md
-  # before calling this.
-  sed -i.bak "s/^STATUS: .*/STATUS: WAITING: ${peer}/" .consult/STATE.md
-  rm -f .consult/STATE.md.bak
-
-  echo "consult_resume: STATUS=WAITING:${peer} (ROUND unchanged)"
-  consult_handoff "$peer"
 }

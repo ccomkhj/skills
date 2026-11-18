@@ -33,13 +33,13 @@ Orchestrators that keep working toward a goal over many turns.
 
 | Skill | Version | Description |
 |-------|---------|-------------|
-| [pair-consult](./pair-consult) | 1.2.0 | Two agents debate one question (propose → review → respond → synthesize), then ask you |
+| [pair-consult](./pair-consult) | 2.0.0 | Second opinion from the other CLI: you propose, a headless Codex/Claude reviewer critiques it cold (review → respond → re-review), then you decide |
 | [sub-consult](./sub-consult) | 2.0.0 | Faster pair-consult: a panel of reviewers (defined in `panel.toml`) runs in parallel |
 | [pair-optimize](./pair-optimize) | 1.1.0 | Speed up a SQL query or hot Python path; a win is kept only if it is faster **and** gives identical output |
 | [pair-ratchet](./pair-ratchet) | 1.0.0 | Repeat pair-optimize on the next bottleneck until no more wins |
 
 ```
-/pair-consult "<question>" [--number 7] [--model high|xhigh]
+/pair-consult [what the reviewer should judge, or a new question] [--number 7] [--effort high|xhigh]
 /sub-consult  "<question>" [--number 3]
 ```
 

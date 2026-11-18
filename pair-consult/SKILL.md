@@ -1,225 +1,69 @@
 ---
 name: pair-consult
-description: Bounded multi-round consultation (default 5 rounds, set with --number) between Claude Code and Codex on a single user question or small coding task — A proposes, B reviews, A responds, B re-reviews, A synthesizes and asks the user. Use when a single coding question warrants a tight structured back-and-forth ending in user confirmation, rather than a full spec→plan→code workflow.
-argument-hint: "<question> [--number n] [--model high|xhigh]"
+description: "Second opinion from the other agent CLI before the user decides: you propose, a headless Codex or Claude reviewer critiques it cold over a bounded number of rounds, you synthesize and ask the user. Use for one question, proposal, or small change that deserves an independent review; not for multi-step implementation."
+argument-hint: "[what the reviewer should judge, or a new question] [--number n] [--effort high|xhigh]"
 ---
 
 # pair-consult
 
-## TL;DR for a cold-woken peer
+You are **A**, the live orchestrator. **B** is the other CLI, run headless for one round at a time. B never sees this chat. It knows only the repo and `.consult/`, and that independence is the point: a reviewer briefed with your conclusions returns them confirmed.
 
-You were invoked via `codex exec` or `claude -p` with *"Resume the pair-consult skill. Read .consult/STATE.md..."*. You are a **one-shot peer**: you do exactly ONE round (an even round — R2, R4, …) and exit. Do this:
+> Woken headless as the reviewer? Your whole brief is [reference/peer.md](reference/peer.md). Nothing below is for you.
 
-1. `cat .consult/STATE.md .consult/QUESTION.md .consult/USER_NOTES.md` — orient.
-2. Confirm `STATUS: WAITING: <you>` and read `ROUND:` + `ROUNDS:`. You are B, so this round is a review — a fresh-critique review (R2-style) of A's latest proposal/response by default. It's a *re-review* (R4-style, accept/double-down) **only when `ROUNDS >= 5` and `ROUND == ROUNDS-1`** (the last B round, which follows an A-response). At `n=3` there's no A-response round, so the single B round is always a fresh review. See [Round protocol](#round-protocol--one-allowed-action-per-round).
-3. Write `R<ROUND>.md`, then update `STATE.md`: set `STATUS: WAITING: <A's CLI name>` (the value of STATE.md's `A:` line, e.g. `WAITING: claude` — never the literal letter "A") and bump `ROUND`.
-4. **EXIT. Do NOT call `consult_handoff` or `consult_wait`.** The orchestrator (the interactive session that woke you) is already blocked in `consult_wait` and resumes the instant you flip `STATE.md`. If you hand off, you spawn a **duplicate orchestrator** — two instances then write the same round and collide on `STATE.md`. This is the bug. Don't be it.
+## What the user typed
 
-**You never do the final round.** The final round (`ROUND == ROUNDS`) is always the orchestrator's synthesis. Only the orchestrator runs `consult_handoff` + `consult_wait`; see [Two roles](#two-roles) and [Handoff](#handoff).
+The text after `/pair-consult` is the **ask**: what the user wants settled. Copy it verbatim into `QUESTION.md`; it becomes B's mandate.
 
-No session memory across turns. State lives in `.consult/`. Templates for every file are in [reference/file-formats.md](reference/file-formats.md).
-
-## Overview
-
-The default session is **5 rounds**. `--number n` sets the **round cap** (`ROUNDS:` in `STATE.md`) — a max, since [early termination](#early-termination--skip-ahead-when-theres-consensus) can finish sooner; see [Flags](#flags). The 5-round shape:
-
-| Round | Actor | Action | Output | After |
-|---|---|---|---|---|
-| **R1** | A (orchestrator) | Propose | `R1.md` (+ code in repo if coding) | flip `WAITING: B` → `consult_handoff B` + `consult_wait` |
-| **R2** | B (peer, one-shot) | Review proposal | `R2.md` (agreements + numbered critiques) | flip `WAITING: <A's CLI name>` → **exit** (no handoff, no wait) |
-| **R3** | A (orchestrator) | Respond per critique (agree/partial/object) | `R3.md` | flip `WAITING: B` → `consult_handoff B` + `consult_wait` |
-| **R4** | B (peer, one-shot) | Re-review (accept/double-down) | `R4.md` | flip `WAITING: <A's CLI name>` → **exit** (no handoff, no wait) |
-| **R5** | A (orchestrator) | Synthesize, ask user | `R5.md` — user reads this | stop — `STATUS: AWAITING_USER` |
-
-**General rule for any odd `n` (`ROUNDS`):** round 1 = A proposes; the final round `n` = A synthesizes (`AWAITING_USER`); interior rounds alternate — **even rounds = B reviews, odd rounds = A responds**. `n` is always odd (forced at init) so A is both the first proposer and the last synthesizer. At `n=3` it's propose · review · synthesize (one B round, a fresh review — no re-review); at `n=5` it's exactly the table above; at `n=7` it's propose · review · respond · review · respond · re-review · synthesize.
-
-After the final round, `STATUS: AWAITING_USER` and the loop stops. The user's reply (confirm / redirect / cancel) closes the session.
-
-## Two roles
-
-The loop has an **asymmetry that prevents duplicate instances** — internalize it before anything else.
-
-- **Orchestrator = A** = the interactive session that ran `/pair-consult`. It is alive for the whole session. It does the odd rounds (R1, R3, … and the final round). After each non-final round it spawns the peer (`consult_handoff B`) and blocks in `consult_wait` until the peer flips `STATE.md` back. After the final round it stops.
-- **Peer = B** = a *fresh, headless, one-shot* instance, cold-woken by the orchestrator's `consult_handoff`. It does exactly one round (an even round — R2, R4, …), flips `STATUS: WAITING: <A's CLI name>`, and **exits**. It never calls `consult_handoff` and never calls `consult_wait`.
-
-**Why:** `consult_handoff` always *spawns a new instance* of the named peer. If the peer (B) hands back with `consult_handoff A`, it spawns a **second A** — while the original orchestrator A is still alive in `consult_wait`. Both then see `WAITING: <A's CLI name>`, both act, both write the round, and they collide on `STATE.md` (`Error editing file`). The only safe shape is: **only the orchestrator hands off and waits; the peer flips-and-exits.** A peer that is alive does not need to be re-spawned — it's already waiting.
-
-So `consult_handoff` + `consult_wait` are **orchestrator-only** verbs. If you were cold-woken by a resume prompt, you are the peer: flip and exit.
-
-## When to use
-
-- `/pair-consult <question>` (fresh) or `/pair-consult` (resume).
-- Work fits in one round of proposal — not a 5-step plan. If it doesn't fit, break it into smaller questions or use a full planning workflow.
-- User wants a structured second opinion ending in their own go/no-go.
-- You were invoked as the peer by the active agent.
-
-**Don't use for:** multi-step implementation (use a full planning workflow), open-ended exploration (use brainstorming), one-shot code review (use `code-review`), or solo work.
-
-## Round protocol — one allowed action per round
-
-Each round is narrow on purpose. Stay in your lane. **Templates for each round file are in [reference/file-formats.md](reference/file-formats.md);** the semantics are below — each bullet's header names the rounds it covers (1:1 with R1–R5 at `n=5`; for larger odd `n` the review/respond actions repeat per the [Overview](#overview) rule).
-
-- **Propose (round 1, A).** Read `QUESTION.md`. For coding tasks, write the actual code in the repo, run the test, then write `R1.md` as the design rationale (not a code dump).
-- **Review (even rounds, B).** Read the latest `R*.md` and (for coding) `git diff` + run the tests yourself. Open numbered critiques in `R<round>.md` — do **not** edit A's artifacts. Your critiques drive A's next round. Then flip `STATUS: WAITING: <A's CLI name>`, bump `ROUND`, and **exit** — you are one-shot; do not hand off.
-- **Respond (odd interior rounds, A).** For each numbered critique, write a verdict (`agree` / `partial` / `object`), the action you took, and reasoning when not pure agreement. Address **every** critique — skipping one is a bug. If you applied code changes, re-run the test and note the result in the relevant C-block.
-- **Re-review (round `n-1`, the last B round — only when `n >= 5`).** Exists only when a preceding A-response round feeds it, so **never at `n=3`** (there the one B round is a fresh review). For each item where A objected or partial-applied, decide `accept` or `double down`. **No fresh critiques** — bugs A introduced in the prior round are double-downs with a sub-finding, not new Cs. This is B's last word. Then flip `STATUS: WAITING: <A's CLI name>`, set `ROUND: <n>`, and **exit** — do not hand off (A is already waiting and writes the final round).
-- **Synthesize (round `n`, A).** Write the user-facing close: what we landed on, where we agreed, unresolved tensions plainly stated, what we need from the user. Then `STATUS: AWAITING_USER` and stop.
-
-### Early termination — skip ahead when there's consensus
-
-`ROUNDS` (default 5) is the max, not the requirement. Skip when the next round would be a rubber-stamp; when in doubt, do the round. The triggers are role-relative — they hold at any `n`:
-
-| Trigger | What to do |
-|---|---|
-| A B-review has zero critiques (full agreement) | Skip the rest of the interior rounds. A jumps to the final synthesis round directly. |
-| An A-response is all `agree` AND adds no new code/claims/reasoning | Skip the next B-review. A jumps to synthesis directly. |
-| An A-response is all `agree` but introduces new substance | Run the next B-review — it catches regressions A introduced. (The skill's trial caught a real null-semantics bug this way.) |
-| An A-response has any `object` or `partial` | Run the next B-review. |
-| The last B re-review is done | Always run the final synthesis round — it's where the user is asked. |
-
-When skipping ahead, jump straight to the final round (`ROUND: <n>`, A synthesizes, `AWAITING_USER`) — early exit never lands the terminal step on B. Mark skipped round-log rows `skipped`, and call out the skip in the synthesis so the user sees the early exit.
-
-## Surfacing rounds in chat — keep the user in the loop
-
-After every round (yours OR the peer's), print a 5-15 line digest in chat *before* doing your next action. This is what makes pair-consult feel like a conversation instead of a black-box file machine. Use `consult_digest <N>` from [reference/handoff.sh](reference/handoff.sh) — it extracts agreements + critique titles + per-C verdicts + overall verdict, already truncated.
-
-```
-**B's R2:**
-- ✓ <agreement, one line>
-- ! C1: <critique title>
-- ! C2: <critique title>
-```
-
-```
-**My R3:**
-- ✓ Agreed on C1, C2, C3, C5
-- ↳ C4: partial — kept the WITH ORDINALITY shape but added type placeholders
-- One new claim: SQL-side dedupe preferable to app-side (going into R4)
-```
-
-The user can interrupt at any moment. Treat any user message as a steer — address it before continuing.
-
-## Shared state in `.consult/`
-
-Create `.consult/` at the repo root on init and append `.consult/` to `.gitignore`. Files:
-
-| File | Purpose | Written by |
+| Situation | R1 is | The ask tells B |
 |---|---|---|
-| `QUESTION.md` | User's question + pinned context | Active agent on init |
-| `STATE.md` | `ROUND`, `STATUS`, `A`, `B`, round log | Every round |
-| `R1.md` … `R<ROUNDS>.md` | Round content | Actor of that round |
-| `USER_NOTES.md` | User-injected steers (created lazily) | `consult_inject` |
-| `session.log` + `round-<N>-<peer>.log` | Peer stdout | `consult_handoff` |
+| You already proposed something in this conversation | that proposal, packaged for a cold reader | what to judge about it (`anything to remove before implementing?`) |
+| No proposal yet | your answer to the ask (coding task: write the code, run the tests) | the question it must also answer |
+| No text | your latest proposal | is it right, and what should be cut? |
+| `.consult/STATE.md` exists | — | resume: see [Resume](#resume) |
 
-`A` and `B` are fixed for the session — whoever proposed in R1 is A. Full templates in [reference/file-formats.md](reference/file-formats.md).
+Flags map to `consult_init`: `--number n` is the round cap, `--effort` is B's reasoning effort.
 
-## Entry modes
+## Rounds
 
-Both modes accept the optional flags in [Flags](#flags) (`--number n`, `--model high|xhigh`). Parse them off the invocation first, then write the resolved `ROUNDS:` and `EFFORT:` into `STATE.md` at init. With no `--model`, write `EFFORT: high` — the codex peer runs `gpt-6-astra` at high reasoning depth by default.
+| Round | Actor | Kind | Writes |
+|---|---|---|---|
+| 1 | A | propose | `R1.md` |
+| even | B | review: numbered critiques `C1…` | `R<n>.md` |
+| odd, interior | A | respond: a verdict per critique | `R<n>.md` |
+| cap − 1, when cap ≥ 5 | B | re-review: accept or double down, B's last word | `R<n>.md` |
+| cap | A | synthesize, ask the user | `R<cap>.md` |
 
-### Mode 1 — fresh question: `/pair-consult "<question>" [--number n] [--model high|xhigh]`
-Standard init. You are the orchestrator (A). Write `QUESTION.md` and `STATE.md` (`ROUND: 1`, `ROUNDS: <n>`, `STATUS: ACTIVE: <you>`, `A: <you>`, `B: <peer>`, `EFFORT: <effort>`), then do R1 as described in the Round protocol. After R1, `ROUND: 2`, `STATUS: WAITING: <peer>`, then `consult_handoff <peer>` + `consult_wait` and stay alive for the rest of A's rounds (every odd round through the final).
+## Steps
 
-### Mode 2 — continue from session: `/pair-consult --from-session [--number n] [--model high|xhigh]`
-**Use when you're mid-conversation with the user and you've just proposed something** — code, an approach, a decision — and the user wants the peer to grill it. You are implicitly A; your most-recent proposal becomes R1 content.
-
-1. Write `QUESTION.md` from the user's recent turn — include enough context that B can act cold (B does NOT see chat history; only `.consult/`).
-2. Write `R1.md` by summarizing your most-recent proposal — don't restate the conversation, extract the proposal into the R1 template.
-3. `STATE.md`: `ROUND: 2`, `ROUNDS: <n>`, `STATUS: WAITING: <peer>`, `A: <you>`, `B: <peer>`, `EFFORT: <effort>`. Round-log starts with the R1 row noting `from-session`.
-4. `consult_handoff <peer>` + `consult_wait` — B does R2 (one-shot) and flips back; your `consult_wait` resumes you for R3.
-
-### Flags
-
-| Flag | Meaning | Default |
-|---|---|---|
-| `--number n` (alias `--rounds n`) | Requested **round cap / depth**, written to `ROUNDS:` — it's a max ([early termination](#early-termination--skip-ahead-when-theres-consensus) can end sooner). **Normalized to odd and `>= 3`** so A both proposes and synthesizes: even `n` snaps **up** to `n+1`, `n < 3` rises to `3`. Always print a one-line reason *before* the loop, e.g. `--number 4 can't end on A; using a 5-round cap so A synthesizes last.` Larger `n` = longer wall-clock (each round is a fresh peer cold-start), so flag very large values. | `5` |
-| `--model high\|xhigh` | Peer reasoning effort, written to `EFFORT:`. `consult_handoff` injects `codex exec -c model_reasoning_effort=<v>` / `claude --effort <v>`. Omitted → `EFFORT:` is left empty and `consult_handoff` falls back to `high`. | `high` |
-
-Note: only `high` and `xhigh` are accepted. The flag sets *reasoning depth*, not which model runs — the codex peer is pinned to **`gpt-6-astra` at `high`** (see below), so `--model high` restates the default and `--model xhigh` is the only value that changes anything.
-
-**Peer model.** `consult_handoff` passes `codex exec -m gpt-6-astra` explicitly, so the peer doesn't drift with whatever `model` is set in `~/.codex/config.toml` (currently `gpt-6-astra`, `model_reasoning_effort = "medium"` — the skill overrides that effort to `high`). Override per-shell with `PAIR_CONSULT_CODEX_MODEL=<id>` before sourcing/calling `consult_handoff`. The claude peer has no model pin; it runs the CLI's own default at `--effort high`.
-
-**Auto-detect Mode 2:** when `/pair-consult` is invoked with no question argument AND no existing `.consult/` AND the recent conversation contains a proposal you authored, default to Mode 2 without requiring `--from-session` explicitly. Otherwise prompt the user for a question.
-
-If `.consult/` already exists, **don't overwrite** — treat as resume; show `consult_status` and ask whether to continue or `rm -rf .consult/` for a fresh start.
-
-## Handoff
-
-**`consult_handoff` + `consult_wait` are orchestrator-only.** You run them only after *your own* non-final A round (R1, R3, … any odd round before the last) — never as a cold-woken peer (see [Two roles](#two-roles)). A peer flips `STATE.md` and exits; the orchestrator's existing `consult_wait` picks it up.
-
-After writing your round (as the orchestrator) and updating `STATE.md`:
+State changes go through the helpers in `reference/handoff.sh`. **Source it, don't read it**: each helper checks its preconditions and prints what to do next.
 
 ```bash
-source ~/.claude/skills/pair-consult/reference/handoff.sh   # or ~/.agents/...
-consult_handoff codex                                        # or: consult_handoff claude
+source <skill-dir>/reference/handoff.sh
 ```
 
-`consult_handoff` does the headless invocation correctly (nohup + detach, `--` terminator for claude, `stdbuf` for live logging, and injecting the `EFFORT:` flag per CLI). Do not call this at the final round (`ROUND == ROUNDS`) — the function will refuse and tell you to set `STATUS: AWAITING_USER`.
+The files you write follow [reference/file-formats.md](reference/file-formats.md).
 
-### Then wait — the handoff isn't tracked by the harness
+1. **Init.** `consult_init <you> <peer> [n] [effort]`, then `QUESTION.md` and `R1.md`. B starts cold and pays for every search, so fill every slot of the templates: cited lines let B verify instead of hunt, and evidence grades aim B at your weak claims. Copy scratch scripts into `.consult/`. Done when someone who never saw this chat could act on those two files alone.
 
-`consult_handoff` uses `nohup ... &` to detach the peer, which **takes it outside the Claude Code harness's process tracking**. The harness will NOT notify you when the peer's round lands. If you simply end your turn after `consult_handoff`, you will sit idle until the user pings (which surfaces a file-change reminder) or until a `ScheduleWakeup` fires — both unreliable and high-latency.
+2. **Hand off.** `consult_handoff`, then the wait it prints. The reviewer is detached, so that backgrounded wait is the only thing that wakes you: tell the user B is reviewing, and end your turn.
 
-The fix: **immediately after `consult_handoff`, call `consult_wait`** so the harness has something to track:
+3. **Relay, then respond.** Put the digest `consult_wait` prints in chat, so the user follows the consult as a conversation. Check [early termination](#early-termination); otherwise respond to every critique. Verify B's claims the way B verified yours, and re-run the tests if you changed code. Answer any unaddressed note in `USER_NOTES.md` and mark it addressed. Back to step 2.
 
-```
-# Claude Code (this is the important case):
-Bash(
-  command="source ~/.claude/skills/pair-consult/reference/handoff.sh && consult_wait",
-  run_in_background=true,
-)
-# Codex CLI / inline: call consult_wait in the foreground — it will block until the peer flips STATE.md.
-```
+4. **Synthesize.** Write `R<cap>.md`, even on an early exit (name the skipped rounds), run `consult_close`, and present it. The user's go/no-go ends the consult.
 
-`consult_wait` polls `.consult/STATE.md` every 5s and exits the moment the STATUS line flips off `WAITING: <peer>`. When invoked via `Bash(run_in_background=true)`, the harness tracks the poll-process and notifies you on exit — you learn about R<N+1> at file-write time, not at next-user-ping time.
+Any user message mid-loop is a steer: act on it before continuing. If it invalidates the round B is working on, `consult_takeover`, fix what B will read, then `consult_resume`.
 
-Behavior on exit:
-- **Exit 0** — your turn. Read the new round file, surface a digest, do your round.
-- **Exit 2** — timeout (default 540s, just under Bash's 600s ceiling). Re-invoke `consult_wait`. A peer round legitimately taking >9 min is rare but possible (large code reviews, slow networks).
-- **Exit 3** — the peer likely crashed (no process holds the round log open and the file is stale). Run `consult_status` and `consult_peer_status <peer>` to investigate before retrying.
+### Early termination
 
-## Hazards
+The cap is a maximum. Synthesize early when B's review has zero critiques, or when your response is all `agree` with no new code, claims, or reasoning. Otherwise run B's next round: regressions hide in what you just changed.
 
-All guarded by `consult_handoff` — listed here so you don't reinvent them.
+## Resume
 
-| Hazard | Rule |
-|---|---|
-| `claude -p "<prompt>" <flags>` — flags after prompt hang the CLI | Flags first; use `consult_handoff`. |
-| `claude --add-dir <dir> "<prompt>"` — variadic flag eats prompt | `--` terminator before the prompt. |
-| `claude -p --bare` — fails auth unless `ANTHROPIC_API_KEY` is set | Don't use `--bare`. |
-| `killall claude` / `pkill codex` to recover | Kills the user's main session. Use `consult_peer_status <peer>` to list specific PIDs. |
+`consult_status`, then by `STATUS`:
 
-## Steering as a human
+- `WAITING: <you>` → do round `ROUND`.
+- `WAITING: <peer>` → reviewer running: `consult_wait`. Not running: `consult_handoff`.
+- `AWAITING_USER` → show `R<cap>.md` and ask for the decision.
+- `BLOCKED` → say what is blocked; `consult_resume` reruns B's round.
 
-While the loop runs:
-
-| Command | What it does |
-|---|---|
-| `consult_watch` | `tail -F .consult/session.log` across all rounds. |
-| `consult_status` | One-screen summary: `STATE.md` + open user notes + last 20 log lines. |
-| `consult_inject "<note>"` | Append a USER_NOTE to `.consult/USER_NOTES.md`. Next agent must address it before their round. |
-| `consult_takeover` | Kill peer by PID (via `lsof`), set `STATUS: BLOCKED: human-takeover`. |
-| `consult_resume <peer>` | After takeover + manual edits, hand back. Does NOT bump `ROUND`. |
-| `consult_digest <N>` | Print the terse digest of `R<N>.md` — used by the active agent to surface in chat. |
-
-## Common mistakes
-
-| Mistake | Fix |
-|---|---|
-| Doing more than one round's work in a turn | R1 proposes, doesn't preempt R2. R2 critiques, doesn't rewrite A's code. |
-| Skipping critiques in R3 | Address every numbered critique. Even `object` is an answer. |
-| Adding new critiques in R4 | R4 is `accept` / `double down` only. New bugs from R3 are double-downs with sub-findings. |
-| Peer (B) calling `consult_handoff`/`consult_wait` after a B round (R2, R4, …) | This spawns a **duplicate orchestrator** that races the live one — two instances write the same round and collide on `STATE.md` (`Error editing file`). The peer is one-shot: flip `STATUS: WAITING: <A's CLI name>` and **exit**. Only A hands off and waits. See [Two roles](#two-roles). |
-| Writing `STATUS: WAITING: A` (the role letter) | STATUS names the CLI: `WAITING: claude` / `WAITING: codex` — `consult_handoff` matches on the name. Read it off STATE.md's `A:` line. |
-| Invoking peer at the final round | The final round (`ROUND == ROUNDS`) ends the loop. Surface to user. |
-| R5 hides unresolved tensions | Surface them plainly. Let the user decide. |
-| Idling after `consult_handoff` ("harness will notify me") | It won't — the peer is `nohup`'d, outside harness tracking. Always follow `consult_handoff` with `consult_wait` (via `Bash(run_in_background=true)` in Claude Code) so the harness has a tracked process to notify on. |
-| Telling the user "I'll wait for the peer" with no scheduled wakeup or background wait | Same root cause as above. The wait must be a real tracked process, not an intention. |
-
-## Resuming
-
-`/pair-consult` with no args + existing `.consult/` → resume:
-- `WAITING: <you>` → do your round.
-- `WAITING: <peer>` → loop is mid-flight; `consult_watch` or report state.
-- `AWAITING_USER` → show the final round file (`R<ROUNDS>.md`) and ask what they want.
-- `BLOCKED` → tell the user what's blocked; offer `consult_resume <peer>`.
+For the user in a second terminal: `consult_watch` tails the reviewer live, `consult_inject "<note>"` leaves a steer in `USER_NOTES.md`.
