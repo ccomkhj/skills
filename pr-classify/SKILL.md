@@ -1,8 +1,9 @@
 ---
 name: pr-classify
-version: 1.0.0
-description: Triage a PR as safe to merge, nice to review, or reject to merge in a fresh, unbiased context, then act on the verdict. Use after writing a PR body with /pr, or when asked whether a PR is safe or ready to merge.
+version: 1.1.0
+description: After /pr, a fresh-context agent rates the PR safe to merge, nice to review, or reject to merge, then records the verdict on GitHub and acts on it.
 argument-hint: "[PR number or URL]"
+disable-model-invocation: true
 ---
 
 # pr-classify
@@ -23,10 +24,11 @@ Hand it only pointers: the PR (or branch + base), the repo path, and [references
 
 ## Steps
 
-1. **Pin the target.** Argument, else the current branch's PR. No PR yet → the subagent classifies the branch against its base, and the merge offer includes opening the PR with the `/pr` body.
+1. **Pin the target and its head SHA.** Argument, else the current branch's PR. No PR yet → the subagent classifies the branch against its base, and the merge offer includes opening the PR with the `/pr` body. The SHA is what gets judged, so it is also what the verdict is recorded on.
 2. **Dispatch** the fresh subagent and wait for its report.
 3. **Relay the verdict as returned.** You may escalate it if you know something it couldn't (e.g. a known prod incident in that area); never downgrade it, since your read is the biased one.
-4. **Act on the class.**
+4. **Record the verdict** you relayed as a commit status on the pinned SHA, per [references/verdict-status.md](references/verdict-status.md).
+5. **Act on the class.**
 
 ## Safe → merge
 

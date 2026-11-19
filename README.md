@@ -95,7 +95,7 @@ manage-context's report opens on **Where the baseline goes**: the tokens every s
 |-------|---------|-------------|
 | [humanizer](./humanizer) | 2.8.1 | Remove signs of AI-generated writing. Based on [blader/humanizer](https://github.com/blader/humanizer) |
 | [simplify-python](./simplify-python) | 1.0.0 | Make recent Python cleaner without changing behavior |
-| [pr-classify](./pr-classify) | 1.0.0 | After `/pr`, a fresh-context agent rates the PR safe to merge / nice to review / reject to merge; merges (and promotes dev → main) only after you approve |
+| [pr-classify](./pr-classify) | 1.1.0 | After `/pr`, a fresh-context agent rates the PR safe to merge / nice to review / reject to merge, records the verdict as a commit status, and merges (and promotes dev → main) only after you approve. `/pr-classify [PR]` |
 | [pr-report](./pr-report) | 1.0.0 | PR health dashboard: who each open PR is waiting on, cycle and pickup time, review coverage, size and risk, and /pr + /pr-classify adoption. Markdown in chat, `--html` for a full page. `/pr-report [owner/repo]` |
 | [log-progress](./log-progress) | 1.0.0 | Keep a living log of what was established, tested and rejected (with reasons), as one Linear comment edited in place or a markdown file, so the next agent can start a different experiment without re-running dead ends. `/log-progress [ISSUE-ID|path.md]` |
 | [slack-comm](./slack-comm) | 3.0.0 | Turn the session's work into a short Slack report or request, saved as a draft. `/slack-comm` |

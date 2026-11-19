@@ -12,7 +12,7 @@ A wrong *safe* ships an incident; a wrong *nice to review* costs a human ten min
 
 ## Process
 
-1. **Gather evidence.** Full diff, CI checks (pending is not green: wait for them), PR body, repo standards (AGENTS.md, CONTRIBUTING). Trace past the hunks wherever the change touches callers, schemas, config, or migrations.
+1. **Gather evidence.** Full diff, CI checks (pending is not green: wait for them; ignore the `pr-classify` status, which is a previous verdict, not CI), PR body, repo standards (AGENTS.md, CONTRIBUTING). Trace past the hunks wherever the change touches callers, schemas, config, or migrations.
 2. **Classify.** Every finding gets a severity and a `file:line`. Class = worst finding, capped by evidence.
 3. **Return the report** below as your final message.
 
