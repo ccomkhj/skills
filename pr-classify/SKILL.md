@@ -1,7 +1,7 @@
 ---
 name: pr-classify
-version: 1.1.0
-description: After /pr, a fresh-context agent rates the PR safe to merge, nice to review, or reject to merge, then records the verdict on GitHub and acts on it.
+version: 1.2.0
+description: After /pr, a fresh-context agent rates the PR safe to merge, nice to review, or reject to merge, raising only issues proven with evidence (each with a risk) plus a confidence to accept, then records the verdict on GitHub and acts on it.
 argument-hint: "[PR number or URL]"
 disable-model-invocation: true
 ---
@@ -10,11 +10,13 @@ disable-model-invocation: true
 
 The step after `/pr`: decide whether this PR can ship without a human reading it.
 
-| Class | Meaning | Action |
-|---|---|---|
-| **safe to merge** | Confident it introduces no production issue | Ask to merge; on yes, merge (and promote dev → main if the repo uses that flow) |
-| **nice to review** | Code-quality issues or possible minor bugs, nothing production-critical | Report findings; a human reviews before merge |
-| **reject to merge** | A production-critical issue | Report what must be fixed; leave the PR unmerged |
+The class comes from [references/verdict.md](references/verdict.md). Each one leads to an action:
+
+| Class | Action |
+|---|---|
+| **safe to merge** | Ask to merge; on yes, merge (and promote dev → main if the repo uses that flow) |
+| **nice to review** | Report the issues and confidence gaps; a human reviews before merge |
+| **reject to merge** | Report what must be fixed; leave the PR unmerged |
 
 ## Why a fresh context
 
