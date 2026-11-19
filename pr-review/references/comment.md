@@ -4,31 +4,21 @@ The first line is the receipt `run.sh` looks for; without it the run counts as f
 
 ```markdown
 <!-- pr-review:<head SHA> -->
-## pr-review: <class> · `<head SHA, 7 chars>`
+## pr-review: <class> · confidence <level> · risk <highest issue risk | none> · `<head SHA, 7 chars>`
 <one line: why this class>
 
 <stale only> ⚠️ Stale: reviewed `<sha7>`, the PR head is now `<sha7>`. No status set; review the new head: `~/.claude/skills/pr-review/scripts/run.sh <url>`.
 
-**How the class was decided:** classifier said <class>; the code review <raised it because … | did not change it>. <list what was incomplete, if anything>
+**Confidence <level>:** <the evidence for accepting this head (CI, tests run at the head, callers traced, door), then what's missing: gaps, unresolved candidates, incomplete parts>
 
-<details><summary>Classifier: production risk</summary>
+**Issues** (<N>, highest risk first) · inline: <review URL | none on a changed line | failed: <why>>
 
-<classifier report, verbatim>
-</details>
+1. **<risk> risk** · `<path:line>` · <lens(es)>: <what is wrong> → <what it does to this service>
+   **Evidence:** <reproduction, contradiction or trace, per the verdict rules>
 
-<details><summary>Code review: Standards</summary>
+<no issues> No issues: <M> candidates checked, none proven wrong.
 
-Inline: <N findings on the diff: review URL | none on a changed line | failed: <why>>
-
-<verbatim>
-</details>
-
-<details><summary>Code review: Spec</summary>
-
-<verbatim, or "incomplete: <why>">
-</details>
-
-<sub>Fresh-context review by pr-review · report only, nothing was merged</sub>
+<sub>Fresh-context review by pr-review · only evidenced issues are raised · report only, nothing was merged</sub>
 ```
 
-Keep the two code-review sections separate and in the reviewer's own words: merging or re-ranking them hides which lens found what.
+Lens = classifier, standards or spec. Naming it shows the author which kind of reading caught the problem. Dropped and unresolved candidates stay in `<run dir>/candidates.md`; only the confidence line mentions unresolved ones.

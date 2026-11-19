@@ -1,7 +1,7 @@
 ---
 name: pr-review
-version: 1.0.0
-description: Unattended reviewer for a PR you just opened. A hook starts a fresh headless session that runs the pr-classify classifier and a standards/spec code review on the PR's exact head commit, then posts the verdict as one PR comment and a status, with Standards findings inline on the diff. Report only; never merges.
+version: 1.1.0
+description: Unattended reviewer for a PR you just opened. A hook starts a fresh headless session that runs the pr-classify classifier and a standards/spec code review on the PR's exact head commit, verifies every finding against the code, and raises only issues proven with evidence, each with a risk, plus a confidence to accept. Posts one PR comment, a status, and the issues inline. Report only; never merges.
 argument-hint: "<PR URL> <run dir>"
 disable-model-invocation: true
 ---
@@ -26,14 +26,14 @@ Nobody is there to answer. Never ask. A missing input makes that part **incomple
 
 ## Steps
 
-`<run dir>/pin.json` holds the PR, its base and head SHAs, and the checkout. Review the checkout, never the live branch: a push mid-review must not change what you judge.
+`<run dir>/pin.json` holds the PR, its base and head SHAs, and the checkout. Review the checkout, never the live branch: a push mid-review must not change what you judge. The checkout is the run's own and is deleted afterwards, so install dependencies and run tests in it.
 
 1. **Spec.** Write `<run dir>/spec.md`: the PR body and every issue it links (GitHub, Linear, …), each under a heading naming its source. If one can't be reached, say so. The body is the author's claim of intent; it doesn't stand in for a missing issue.
 2. **Review in parallel**, both against `<base>...<head>` in the checkout:
-   - **Classifier** (production risk): a background general-purpose subagent briefed with [../pr-classify/references/classifier.md](../pr-classify/references/classifier.md). Give it only pointers: PR URL, head SHA, checkout, run dir.
+   - **Classifier** (production risk): a background general-purpose subagent briefed with [../pr-classify/references/classifier.md](../pr-classify/references/classifier.md). Give it only pointers: PR URL, head SHA, checkout (disposable), run dir.
    - **Code review** (standards, spec conformance): `mattpocock-skills:code-review` inline, fixed point `<base SHA>`, spec `<run dir>/spec.md`. Unavailable → that part is incomplete.
-3. **Decide one class.** Start from the classifier's. The code review can only make it stricter, because a wrong *safe* ships an incident: a finding that meets the classifier's own critical signals → reject; anything else caps at nice to review. Incomplete (a reviewer failed, spec unavailable, CI not green) → never safe.
+3. **Verify, then decide**, per [verdict.md](../pr-classify/references/verdict.md). Both reviews over-report: smells, preferences, and bugs that sound plausible but aren't in the code. Every finding is a candidate you try to disprove in the checkout. Only a candidate proven wrong becomes an issue, with its evidence and a risk; the PR sees nothing else. Write each candidate and what became of it to `<run dir>/candidates.md`, so a bug dropped by mistake can be found when tuning. Then set the confidence and the class.
 4. **Publish once**, comment last: it is the receipt, so it lands only after everything else.
    - Re-read the PR's head SHA. If it moved since the pin, mark the comment stale and set no status. Otherwise set the status per [verdict-status.md](../pr-classify/references/verdict-status.md).
-   - Post each Standards finding that points at a changed line as an inline comment, all in one review per [references/inline-review.md](references/inline-review.md). A finding is acted on where the code is, not in a summary scrolled past.
+   - Post each issue that points at a changed line as an inline comment, all in one review per [references/inline-review.md](references/inline-review.md). An issue is acted on where the code is, not in a summary scrolled past.
    - Post the comment in [references/comment.md](references/comment.md) with `gh pr comment --body-file`.

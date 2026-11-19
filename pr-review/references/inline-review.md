@@ -1,6 +1,6 @@
-# Inline Standards review
+# Inline issues
 
-One GitHub review, event `COMMENT`, with a comment on the diff line of each Standards finding. The author reads and answers a finding next to the code; the verdict stays in the summary comment.
+One GitHub review, event `COMMENT`, with a comment on the diff line of each issue (a candidate that survived [verification](../../pr-classify/references/verdict.md)). The author reads and answers an issue next to the code; the verdict stays in the summary comment.
 
 `gh pr review` is blocked (it can approve), so post through the API:
 
@@ -12,19 +12,19 @@ gh api repos/<owner>/<repo>/pulls/<N>/reviews --input <run dir>/review.json
 {
   "commit_id": "<pinned head SHA>",
   "event": "COMMENT",
-  "body": "pr-review · Standards findings on `<sha7>`. The verdict and full report are in the pr-review comment on this PR.",
+  "body": "pr-review · issues on `<sha7>`, each with its evidence. The verdict is in the pr-review comment on this PR.",
   "comments": [
     {
       "path": "src/server/library.ts",
       "line": 42,
       "side": "RIGHT",
-      "body": "**<hard violation | judgement call>: <short title>**\n\n<the finding in the reviewer's words, with the rule it cites>"
+      "body": "**<risk> risk: <short title>**\n\n<what is wrong> → <what it does to this service>\n\n**Evidence:** <reproduction, contradiction or trace>"
     }
   ]
 }
 ```
 
 - `commit_id` is the pinned head, so the comments stay on the code that was judged even if the branch moved.
-- Every `line` must be inside a hunk of `git diff <base>...<head>`: a head-side line with `side: RIGHT`, or, when the finding is about removed code (a deleted export something still imports), the deleted line with `side: LEFT` and its line number in the base file. Add `start_line` for a range. GitHub rejects the whole review (422) if one line is outside the diff, so check each line before posting. A finding with no such line (missing test, a file the PR doesn't touch) stays in the summary comment only.
+- Every `line` must be inside a hunk of `git diff <base>...<head>`: a head-side line with `side: RIGHT`, or, when the issue is about removed code (a deleted export something still imports), the deleted line with `side: LEFT` and its line number in the base file. Add `start_line` for a range. GitHub rejects the whole review (422) if one line is outside the diff, so check each line before posting. An issue with no such line stays in the summary comment only.
 - Never `APPROVE` or `REQUEST_CHANGES`: report only.
-- No Standards finding on a diff line → no review.
+- No issue on a diff line → no review.
